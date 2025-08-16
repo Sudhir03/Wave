@@ -1,0 +1,11 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <!-- color change: set stroke below -->
+  <g stroke="#12BDB3" stroke-width="36" stroke-linecap="round" stroke-linejoin="round">
+    <!-- top wave -->
+    <path d="M64 176 C128 128 192 128 256 176 S384 224 448 176"/>
+    <!-- middle wave -->
+    <path d="M64 256 C128 208 192 208 256 256 S384 304 448 256"/>
+    <!-- bottom wave -->
+    <path d="M64 336 C128 288 192 288 256 336 S384 384 448 336"/>
+  </g>
+</svg>
