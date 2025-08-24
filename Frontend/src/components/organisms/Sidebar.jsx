@@ -6,14 +6,12 @@ import { MessageSquare, Phone, Users } from "lucide-react";
 
 export default function Sidebar() {
   return (
-    <div className="w-20 bg-sidebar text-sidebar-foreground flex flex-col items-center py-4 space-y-6">
+    <div className="flex flex-col items-center w-20 py-4 space-y-6 shadow bg-card text-card-foreground">
       {/* Top Logo */}
-      <div className="mb-8">
-        <Logo />
-      </div>
+      <Logo />
 
       {/* Nav Icons */}
-      <nav className="flex flex-col gap-4 flex-grow">
+      <nav className="flex flex-col flex-grow gap-4">
         {[
           { to: "/", icon: MessageSquare },
           { to: "/calls", icon: Phone },
@@ -26,8 +24,8 @@ export default function Sidebar() {
                 size="icon"
                 className={`${
                   isActive
-                    ? "bg-sidebar-icon-active text-sidebar-icon-active-foreground"
-                    : "text-sidebar-foreground"
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground"
                 } transition-colors`}
               >
                 <Icon className="!h-5 !w-5 stroke-current" />
@@ -40,8 +38,8 @@ export default function Sidebar() {
       {/* Avatar at bottom */}
       <div className="mt-auto">
         <NavLink to="/profile">
-          <Avatar className="h-10 w-10 cursor-pointer rounded">
-            <AvatarImage src="/me.png" alt="User Avatar" />
+          <Avatar className="w-10 h-10 rounded cursor-pointer">
+            <AvatarImage />
             <AvatarFallback>👤</AvatarFallback>
           </Avatar>
         </NavLink>
