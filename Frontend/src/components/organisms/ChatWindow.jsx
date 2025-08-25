@@ -240,7 +240,7 @@ export default function ChatWindow() {
 
           {/* Chat List */}
           {showChats && (
-            <div className="flex-1 h-screen overflow-y-auto">
+            <div className="flex-1 h-screen overflow-y-auto scrollbar">
               {filteredChats.map((chat) => {
                 const isActive = String(chat.id) === activeChatId;
                 return (

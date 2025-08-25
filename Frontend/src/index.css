@@ -45,23 +45,30 @@
   --radius: 0.625rem;
 
   /* General UI */
-  --background: #f9fafb; /* page bg light */
-  --foreground: #1f2937; /* page text light */
-  --card: #ffffff; /* card bg */
+  --background: #f9fafb;
+  /* page bg light */
+  --foreground: #1f2937;
+  /* page text light */
+  --card: #ffffff;
+  /* card bg */
   --card-foreground: #1f2937;
   --popover: #ffffff;
   --popover-foreground: #1f2937;
 
   /* Primary & Accent */
-  --primary: #3b82f6; /* buttons primary */
+  --primary: #3b82f6;
+  /* buttons primary */
   --primary-foreground: #ffffff;
-  --secondary: #06b6d4; /* links / secondary actions */
+  --secondary: #06b6d4;
+  /* links / secondary actions */
   --secondary-foreground: #ffffff;
   --muted: #e5e7eb;
   --muted-foreground: #1f2937;
-  --accent: #06b6d4; /* professional accent */
+  --accent: #06b6d4;
+  /* professional accent */
   --accent-foreground: #ffffff;
-  --destructive: #ef4444; /* red alerts */
+  --destructive: #ef4444;
+  /* red alerts */
 
   /* Borders & Input */
   --border: #d1d5db;
@@ -128,7 +135,31 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* ✅ Reusable scrollbar utility */
+@layer utilities {
+  .scrollbar {
+    &::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgb(var(--primary-foreground));
+      border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: rgb(var(--primary-foreground));
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgb(var(--primary-foreground));
+    }
   }
 }
