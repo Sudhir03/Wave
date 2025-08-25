@@ -1,4 +1,4 @@
-import { Link, Outlet, useParams } from "react-router-dom";
+import { NavLink, Link, Outlet, useParams } from "react-router-dom";
 import { useState } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/atoms/Avatar";
 import { Input } from "@/components/atoms/Input";
@@ -244,10 +244,14 @@ export default function ChatWindow() {
               {filteredChats.map((chat) => {
                 const isActive = String(chat.id) === activeChatId;
                 return (
-                  <Link
+                  <NavLink
                     key={chat.id}
                     to={`chat/${chat.id}`}
-                    className="flex items-center p-3 transition-colors rounded-md cursor-pointer hover:bg-accent/10 last:mb-60"
+                    className={({ isActive }) =>
+                      `flex items-center p-3 transition-colors rounded-md cursor-pointer hover:bg-accent/10 last:mb-60 ${
+                        isActive ? "bg-accent/20 text-accent-content" : ""
+                      }`
+                    }
                   >
                     <Avatar className="w-12 h-12">
                       <AvatarImage src={chat.picture} alt={chat.name} />
@@ -279,7 +283,7 @@ export default function ChatWindow() {
                         {chat.lastMessage}
                       </span>
                     </div>
-                  </Link>
+                  </NavLink>
                 );
               })}
             </div>

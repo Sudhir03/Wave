@@ -30,10 +30,10 @@ export default function Profile() {
 
       {/* Actions */}
       <div className="mt-8 w-full max-w-md flex flex-col gap-4">
-        <button className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+        <button className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer">
           Edit Profile
         </button>
-        <button className="px-4 py-2 rounded-md bg-destructive text-white hover:bg-destructive/90 transition-colors">
+        <button className="px-4 py-2 rounded-md bg-destructive text-white hover:bg-destructive/90 transition-colors cursor-pointer">
           Logout
         </button>
       </div>
