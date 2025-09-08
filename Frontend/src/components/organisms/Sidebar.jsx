@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import { Button } from "@/components/atoms/Button";
 import { Logo } from "@/components/atoms/Logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/atoms/Avatar";
-import { MessageSquare, Phone, Users } from "lucide-react";
+import { MessageSquare, Phone, UserCog, Users } from "lucide-react";
 
 export default function Sidebar() {
   return (
@@ -40,7 +40,9 @@ export default function Sidebar() {
         <NavLink to="/profile">
           <Avatar className="w-10 h-10 rounded cursor-pointer">
             <AvatarImage />
-            <AvatarFallback>👤</AvatarFallback>
+            <AvatarFallback className="bg-gradient-to-r from-primary via-secondary to-accent text-white">
+              <UserCog />
+            </AvatarFallback>
           </Avatar>
         </NavLink>
       </div>
