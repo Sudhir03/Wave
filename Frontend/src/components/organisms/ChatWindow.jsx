@@ -1,4 +1,4 @@
-import { NavLink, Link, Outlet, useParams } from "react-router-dom";
+import { NavLink, Outlet, useParams } from "react-router-dom";
 import { useState } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/atoms/Avatar";
 import { Input } from "@/components/atoms/Input";
@@ -7,6 +7,7 @@ import { ChevronUp, ChevronDown } from "lucide-react";
 
 import aliceImg from "@/assets/images/alice.jpg";
 
+/* ------------------ Helper ------------------ */
 function formatTimestamp(date) {
   const now = new Date();
   const diffMs = now - new Date(date);
@@ -22,12 +23,9 @@ function formatTimestamp(date) {
   return `${diffDays} days ago`;
 }
 
+/* ------------------ Data ------------------ */
 const pinnedUsers = [
-  {
-    id: 1,
-    name: "Alice",
-    picture: aliceImg,
-  },
+  { id: 1, name: "Alice", picture: aliceImg },
   { id: 2, name: "Bob", picture: "" },
   { id: 3, name: "Charlie", picture: "" },
 ];
@@ -157,6 +155,7 @@ function getAvatarGradient(id) {
   return avatarGradients[id % avatarGradients.length];
 }
 
+/* ------------------ Component ------------------ */
 export default function ChatWindow() {
   const [search, setSearch] = useState("");
   const [showPinned, setShowPinned] = useState(true);
@@ -171,6 +170,7 @@ export default function ChatWindow() {
     <div className="flex h-full overflow-hidden shadow">
       {/* Left Panel */}
       <div className="w-80 flex flex-col gap-0.5 bg-background text-foreground shadow">
+        {/* Search */}
         <div className="p-4 shadow bg-card text-card-foreground">
           <Input
             placeholder="Search chats..."
@@ -179,6 +179,7 @@ export default function ChatWindow() {
           />
         </div>
 
+        {/* Chat Sections */}
         <div className="h-screen p-4 shadow bg-card text-card-foreground">
           {/* Pinned Header */}
           <div className="flex items-center justify-between mb-2">
@@ -203,18 +204,32 @@ export default function ChatWindow() {
           {showPinned && (
             <div className="flex mb-4 space-x-3 overflow-x-auto">
               {pinnedUsers.map((user) => (
-                <div key={user.id} className="flex flex-col items-center">
-                  <Avatar className="w-12 h-12">
-                    {console.log(user.picture)}
+                <NavLink
+                  key={user.id}
+                  to={`chat/${user.id}`}
+                  className={({ isActive }) =>
+                    `flex flex-col items-center gap-1 p-2 rounded-sm transition-colors
+                     ${
+                       isActive
+                         ? "border-b-2 border-accent text-accent-foreground"
+                         : ""
+                     }`
+                  }
+                >
+                  <Avatar className="w-12 h-12 border border-border shadow-sm">
                     <AvatarImage src={user.picture} alt={user.name} />
-                    <AvatarFallback className={getAvatarGradient(user.id)}>
+                    <AvatarFallback
+                      className={`flex items-center justify-center font-medium ${getAvatarGradient(
+                        user.id
+                      )}`}
+                    >
                       {user.name.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="mt-1 text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground truncate max-w-[60px] text-center">
                     {user.name}
                   </span>
-                </div>
+                </NavLink>
               ))}
             </div>
           )}
@@ -222,7 +237,7 @@ export default function ChatWindow() {
           {/* All Chats Header */}
           <div className="flex items-center justify-between mt-2 mb-2">
             <span className="font-semibold text-foreground">
-              All Chats {filteredChats.length}
+              All Chats ({filteredChats.length})
             </span>
             <Button
               variant="ghost"
@@ -248,14 +263,18 @@ export default function ChatWindow() {
                     key={chat.id}
                     to={`chat/${chat.id}`}
                     className={({ isActive }) =>
-                      `flex items-center p-3 transition-colors rounded-md cursor-pointer hover:bg-accent/10 last:mb-60 ${
-                        isActive ? "bg-accent/20 text-accent-content" : ""
-                      }`
+                      `flex items-center p-3 transition-colors rounded-md cursor-pointer 
+                       hover:bg-accent/10 last:mb-60 
+                       ${isActive ? "bg-accent/20 text-accent-content" : ""}`
                     }
                   >
-                    <Avatar className="w-12 h-12">
+                    <Avatar className="w-12 h-12 border border-border shadow-sm">
                       <AvatarImage src={chat.picture} alt={chat.name} />
-                      <AvatarFallback className={getAvatarGradient(chat.id)}>
+                      <AvatarFallback
+                        className={`flex items-center justify-center font-medium ${getAvatarGradient(
+                          chat.id
+                        )}`}
+                      >
                         {chat.name.charAt(0)}
                       </AvatarFallback>
                     </Avatar>
