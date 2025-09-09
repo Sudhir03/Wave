@@ -18,7 +18,6 @@ import ChatWindow from "@/components/organisms/ChatWindow";
 import ChatDetail from "@/components/organisms/ChatDetail";
 import CallsPanel from "@/components/organisms/CallsPanel";
 import FriendsPanel from "@/components/organisms/FriendsPanel";
-import SettingsPanel from "@/components/organisms/SettingsPanel";
 
 const router = createBrowserRouter([
   // Protected routes with layout
@@ -38,7 +37,6 @@ const router = createBrowserRouter([
       },
       { path: "calls", element: <CallsPanel /> },
       { path: "friends", element: <FriendsPanel /> },
-      { path: "settings", element: <SettingsPanel /> },
       {
         path: "dashboard",
         element: <Dashboard />,
