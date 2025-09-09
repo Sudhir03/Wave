@@ -143,23 +143,53 @@
 
 /* ✅ Reusable scrollbar utility */
 @layer utilities {
-  .scrollbar {
+  .custom-scrollbar {
+    /* Light mode colors */
+    --scrollbar-track: #ffffff;
+    --scrollbar-thumb: #06b6d4;
+    --scrollbar-hover: #06b6d4;
+    --scrollbar-active: #06b6d4;
+
     &::-webkit-scrollbar {
       width: 6px;
-      height: 6px;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: rgb(var(--primary-foreground));
-      border-radius: 4px;
-    }
-
-    &::-webkit-scrollbar-thumb:hover {
-      background: rgb(var(--primary-foreground));
+      height: 4px;
     }
 
     &::-webkit-scrollbar-track {
-      background: rgb(var(--primary-foreground));
+      background: var(--scrollbar-track);
+      border-radius: 8px;
+      margin: 2px;
     }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: 8px;
+      border: 1px solid transparent;
+      background-clip: padding-box;
+      min-height: 20px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: var(--scrollbar-hover);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    }
+
+    &::-webkit-scrollbar-thumb:active {
+      background: var(--scrollbar-active);
+    }
+
+    &::-webkit-scrollbar-corner {
+      background: var(--scrollbar-track);
+      border-radius: 8px;
+    }
+  }
+
+  /* Dark mode overrides */
+  .dark .custom-scrollbar {
+    --scrollbar-track: #1e1e2f;
+    --scrollbar-thumb: #06b6d4;
+    --scrollbar-hover: #06b6d4;
+    --scrollbar-active: #06b6d4;
   }
 }

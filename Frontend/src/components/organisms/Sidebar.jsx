@@ -1,29 +1,39 @@
-import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/atoms/Button";
 import { Logo } from "@/components/atoms/Logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/atoms/Avatar";
 import { MessageSquare, Phone, UserCog, Users } from "lucide-react";
-import ProfileDropdown from "@/components/molecules/ProfileDropdown";
 
 export default function Sidebar() {
-  const [openModal, setOpenModal] = useState(false);
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+
+  const links = [
+    { to: "/", icon: MessageSquare },
+    { to: "/calls", icon: Phone },
+    { to: "/friends", icon: Users },
+  ];
+
+  const isActiveLink = (to) => {
+    if (to === "/") {
+      return pathname === "/" || pathname.startsWith("/chat");
+    }
+    return pathname.startsWith(to);
+  };
 
   return (
     <div className="relative">
-      <div className="flex flex-col items-center w-20 py-4 space-y-6 shadow bg-card text-card-foreground relative h-full z-50">
+      <div className="flex flex-col items-center w-20 pt-4 space-y-6 pb-4 bg-card text-card-foreground relative h-full z-50">
         {/* Top Logo */}
         <Logo />
 
         {/* Nav Icons */}
         <nav className="flex flex-col flex-grow gap-4">
-          {[
-            { to: "/", icon: MessageSquare },
-            { to: "/calls", icon: Phone },
-            { to: "/friends", icon: Users },
-          ].map(({ to, icon: Icon }) => (
-            <NavLink key={to} to={to} end>
-              {({ isActive }) => (
+          {links.map(({ to, icon: Icon }) => {
+            const isActive = isActiveLink(to);
+
+            return (
+              <NavLink key={to} to={to}>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -35,27 +45,22 @@ export default function Sidebar() {
                 >
                   <Icon className="!h-5 !w-5 stroke-current" />
                 </Button>
-              )}
-            </NavLink>
-          ))}
+              </NavLink>
+            );
+          })}
         </nav>
 
         {/* Avatar at bottom */}
         <div className="mt-auto relative">
           <Avatar
             className="w-10 h-10 rounded cursor-pointer"
-            onClick={() => setOpenModal((prev) => !prev)}
+            onClick={() => navigate("/dashboard")}
           >
             <AvatarImage />
             <AvatarFallback className="bg-gradient-to-r from-primary via-secondary to-accent text-white">
               <UserCog />
             </AvatarFallback>
           </Avatar>
-
-          {/* Profile Dropdown Modal at bottom-left */}
-          {openModal && (
-            <ProfileDropdown open={openModal} setOpen={setOpenModal} />
-          )}
         </div>
       </div>
     </div>

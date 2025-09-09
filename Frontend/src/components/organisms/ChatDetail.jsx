@@ -104,16 +104,20 @@ export default function ChatDetail() {
   }
 
   return (
-    <div className="h-full flex flex-col pb-4">
+    <div className="h-full flex flex-col pb-1">
       {/* Header */}
       <div className="flex items-center justify-between border-b-2 border-border p-2.5">
         <div className="flex items-center gap-2">
           <Avatar className="w-12 h-12">
             <AvatarImage src={chat.picture} alt={chat.name} />
-            <AvatarFallback>{chat.name.charAt(0)}</AvatarFallback>
+            <AvatarFallback className="bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white font-medium">
+              {chat.name.charAt(0)}
+            </AvatarFallback>
           </Avatar>
           <div className="flex flex-col leading-tight">
-            <span className="font-semibold text-foreground">{chat.name}</span>
+            <span className="font-semibold text-foreground max-w-48 truncate">
+              {chat.name}
+            </span>
             <span className="text-sm text-muted-foreground">
               {chat.isOnline
                 ? "Online"
@@ -128,8 +132,9 @@ export default function ChatDetail() {
           <MoreHorizontal className="w-5 h-5 cursor-pointer" />
         </div>
       </div>
+
       {/* Messages */}
-      <div className="flex-1 bg-background overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 bg-background overflow-y-auto p-4 space-y-3 custom-scrollbar">
         {messages.map((msg, i) => {
           const isLastInMinute =
             !messages[i + 1] ||
@@ -172,7 +177,7 @@ export default function ChatDetail() {
       </div>
 
       {/* Bottom Panel */}
-      <div className="p-2 flex items-center gap-2 border-t">
+      <div className="p-2 flex items-center gap-2">
         {/* Attach */}
         <button className="p-2 text-muted-foreground hover:text-foreground cursor-pointer">
           <Paperclip className="w-5 h-5" />

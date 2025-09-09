@@ -1,7 +1,6 @@
-import React from "react";
 import { NavLink } from "react-router-dom";
 import { Button } from "../atoms/Button";
-import { User, Settings, Bell, Sliders, HelpCircle } from "lucide-react";
+import { User, Bell, Sliders, HelpCircle } from "lucide-react";
 
 function ProfileSidebar() {
   const links = [

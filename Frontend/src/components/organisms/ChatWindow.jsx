@@ -1,9 +1,23 @@
-import { NavLink, Outlet, useParams } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import { useState } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/atoms/Avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/atoms/DropdownMenu";
 import { Input } from "@/components/atoms/Input";
 import { Button } from "@/components/atoms/Button";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import {
+  ChevronUp,
+  ChevronDown,
+  MoreVertical,
+  X,
+  PinOff,
+  Pin,
+  Trash2,
+} from "lucide-react";
 
 import aliceImg from "@/assets/images/alice.jpg";
 
@@ -23,122 +37,6 @@ function formatTimestamp(date) {
   return `${diffDays} days ago`;
 }
 
-/* ------------------ Data ------------------ */
-const pinnedUsers = [
-  { id: 1, name: "Alice", picture: aliceImg },
-  { id: 2, name: "Bob", picture: "" },
-  { id: 3, name: "Charlie", picture: "" },
-];
-
-const chats = [
-  {
-    id: 1,
-    name: "Alice",
-    picture: aliceImg,
-    lastMessage: "Hey!",
-    timestamp: formatTimestamp("2025-08-20T23:45:00"),
-  },
-  {
-    id: 2,
-    name: "Bob",
-    picture: "",
-    lastMessage:
-      "Let's meet. vcxfd fdfdfff gfggfgfdgg gfffffgfgfd ggffgfdggfgf",
-    timestamp: formatTimestamp("2025-08-20T19:20:00"),
-  },
-  {
-    id: 3,
-    name: "Charlie",
-    picture: "",
-    lastMessage: "Got it",
-    timestamp: formatTimestamp("2025-08-20T06:30:00"),
-  },
-  {
-    id: 4,
-    name: "David",
-    picture: "",
-    lastMessage: "See you",
-    timestamp: formatTimestamp("2025-08-19T12:00:00"),
-  },
-  {
-    id: 5,
-    name: "Eve",
-    picture: "",
-    lastMessage: "Thanks!",
-    timestamp: formatTimestamp("2025-08-18T15:45:00"),
-  },
-  {
-    id: 6,
-    name: "Frank",
-    picture: "",
-    lastMessage: "OK",
-    timestamp: formatTimestamp("2025-08-18T11:15:00"),
-  },
-  {
-    id: 7,
-    name: "Grace",
-    picture: "",
-    lastMessage: "Sure",
-    timestamp: formatTimestamp("2025-08-17T20:00:00"),
-  },
-  {
-    id: 8,
-    name: "Heidi",
-    picture: "",
-    lastMessage: "No problem",
-    timestamp: formatTimestamp("2025-08-17T08:30:00"),
-  },
-  {
-    id: 9,
-    name: "Ivan",
-    picture: "",
-    lastMessage: "Let's go",
-    timestamp: formatTimestamp("2025-08-16T14:50:00"),
-  },
-  {
-    id: 10,
-    name: "Judy",
-    picture: "",
-    lastMessage: "Gotcha",
-    timestamp: formatTimestamp("2025-08-16T09:10:00"),
-  },
-  {
-    id: 11,
-    name: "Karl",
-    picture: "",
-    lastMessage: "Fine",
-    timestamp: formatTimestamp("2025-08-15T18:25:00"),
-  },
-  {
-    id: 12,
-    name: "Leo",
-    picture: "",
-    lastMessage: "Thanks",
-    timestamp: formatTimestamp("2025-08-15T11:40:00"),
-  },
-  {
-    id: 13,
-    name: "Mallory",
-    picture: "",
-    lastMessage: "Cool",
-    timestamp: formatTimestamp("2025-08-14T16:30:00"),
-  },
-  {
-    id: 14,
-    name: "Nina",
-    picture: "",
-    lastMessage: "See you soon",
-    timestamp: formatTimestamp("2025-08-14T08:10:00"),
-  },
-  {
-    id: 15,
-    name: "Oscar",
-    picture: "",
-    lastMessage: "Alright",
-    timestamp: formatTimestamp("2025-08-13T22:50:00"),
-  },
-];
-
 const avatarGradients = [
   "bg-gradient-to-r from-pink-500 to-red-500 text-white",
   "bg-gradient-to-r from-indigo-500 to-blue-500 text-white",
@@ -151,27 +49,154 @@ const avatarGradients = [
   "bg-gradient-to-r from-lime-400 to-green-600 text-black",
 ];
 
-function getAvatarGradient(id) {
-  return avatarGradients[id % avatarGradients.length];
+function getAvatarGradient(idx) {
+  return avatarGradients[idx % avatarGradients.length];
 }
 
 /* ------------------ Component ------------------ */
 export default function ChatWindow() {
   const [search, setSearch] = useState("");
   const [showPinned, setShowPinned] = useState(true);
+  const [pinnedUsers, setPinnedUsers] = useState([
+    { id: 1, name: "Alice", picture: aliceImg },
+    { id: 2, name: "Bob", picture: "" },
+    { id: 3, name: "Charlie", picture: "" },
+  ]);
   const [showChats, setShowChats] = useState(true);
-  const { chatId: activeChatId } = useParams();
+  const [chats, setChats] = useState([
+    {
+      id: 1,
+      name: "Alice",
+      picture: aliceImg,
+      lastMessage: "Hey!",
+      timestamp: formatTimestamp("2025-08-20T23:45:00"),
+    },
+    {
+      id: 2,
+      name: "Bob",
+      picture: "",
+      lastMessage: "Let's meet tomorrow",
+      timestamp: formatTimestamp("2025-08-20T19:20:00"),
+    },
+    {
+      id: 3,
+      name: "Charlie",
+      picture: "",
+      lastMessage: "Got it",
+      timestamp: formatTimestamp("2025-08-20T06:30:00"),
+    },
+    {
+      id: 4,
+      name: "David",
+      picture: "",
+      lastMessage: "See you soon",
+      timestamp: formatTimestamp("2025-08-19T12:00:00"),
+    },
+    {
+      id: 5,
+      name: "Eve",
+      picture: "",
+      lastMessage: "Thanks!",
+      timestamp: formatTimestamp("2025-08-18T15:45:00"),
+    },
+    {
+      id: 6,
+      name: "Frank",
+      picture: "",
+      lastMessage: "OK",
+      timestamp: formatTimestamp("2025-08-18T11:15:00"),
+    },
+    {
+      id: 7,
+      name: "Grace",
+      picture: "",
+      lastMessage: "Sure",
+      timestamp: formatTimestamp("2025-08-17T20:00:00"),
+    },
+    {
+      id: 8,
+      name: "Heidi",
+      picture: "",
+      lastMessage: "No problem",
+      timestamp: formatTimestamp("2025-08-17T08:30:00"),
+    },
+    {
+      id: 9,
+      name: "Ivan",
+      picture: "",
+      lastMessage: "Let's go",
+      timestamp: formatTimestamp("2025-08-16T14:50:00"),
+    },
+    {
+      id: 10,
+      name: "Judy",
+      picture: "",
+      lastMessage: "Gotcha",
+      timestamp: formatTimestamp("2025-08-16T09:10:00"),
+    },
+    {
+      id: 11,
+      name: "Karl",
+      picture: "",
+      lastMessage: "Fine",
+      timestamp: formatTimestamp("2025-08-15T18:25:00"),
+    },
+    {
+      id: 12,
+      name: "Leo",
+      picture: "",
+      lastMessage: "Thanks",
+      timestamp: formatTimestamp("2025-08-15T11:40:00"),
+    },
+    {
+      id: 13,
+      name: "Mallory",
+      picture: "",
+      lastMessage: "Cool",
+      timestamp: formatTimestamp("2025-08-14T16:30:00"),
+    },
+    {
+      id: 14,
+      name: "Nina",
+      picture: "",
+      lastMessage: "See you soon",
+      timestamp: formatTimestamp("2025-08-14T08:10:00"),
+    },
+    {
+      id: 15,
+      name: "Oscar",
+      picture: "",
+      lastMessage: "Alright",
+      timestamp: formatTimestamp("2025-08-13T22:50:00"),
+    },
+  ]);
 
   const filteredChats = chats.filter((chat) =>
     chat.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  const addPin = (chatToPin) => {
+    setPinnedUsers((pinnedUsers) => [chatToPin, ...pinnedUsers]);
+  };
+
+  const removePin = (userId) => {
+    setPinnedUsers((prev) => prev.filter((user) => user.id !== userId));
+  };
+
+  const deleteChat = (chatId) => {
+    // Remove from chats array
+    setChats((prev) => prev.filter((chat) => chat.id !== chatId));
+
+    // Also remove from pinned users if it exists there
+    setPinnedUsers((prev) => prev.filter((user) => user.id !== chatId));
+  };
+
   return (
-    <div className="flex h-full overflow-hidden shadow">
+    <div className="flex h-full overflow-hidden">
       {/* Left Panel */}
-      <div className="w-80 flex flex-col gap-0.5 bg-background text-foreground shadow">
+      <div className="w-80 h-full flex flex-col bg-background text-foreground border-r-2 border-border">
         {/* Search */}
-        <div className="p-4 shadow bg-card text-card-foreground">
+        <div className="p-4 bg-card text-card-foreground">
           <Input
             placeholder="Search chats..."
             value={search}
@@ -179,17 +204,15 @@ export default function ChatWindow() {
           />
         </div>
 
-        {/* Chat Sections */}
-        <div className="h-screen p-4 shadow bg-card text-card-foreground">
-          {/* Pinned Header */}
+        {/* Pinned + Chats Wrapper */}
+        <div className="p-4 bg-card text-card-foreground border-t-2 border-border flex-1 flex flex-col overflow-hidden">
+          {/* Pinned Users */}
           <div className="flex items-center justify-between mb-2">
-            <span className="font-semibold text-card-foreground">
-              Pinned ({pinnedUsers.length})
-            </span>
+            <span className="font-semibold">Pinned ({pinnedUsers.length})</span>
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full hover:bg-background hover:text-foreground w-7 h-7"
+              className="rounded-full w-7 h-7"
               onClick={() => setShowPinned(!showPinned)}
             >
               {showPinned ? (
@@ -200,49 +223,68 @@ export default function ChatWindow() {
             </Button>
           </div>
 
-          {/* Pinned Users */}
           {showPinned && (
-            <div className="flex mb-4 space-x-3 overflow-x-auto">
-              {pinnedUsers.map((user) => (
-                <NavLink
-                  key={user.id}
-                  to={`chat/${user.id}`}
-                  className={({ isActive }) =>
-                    `flex flex-col items-center gap-1 p-2 rounded-sm transition-colors
-                     ${
-                       isActive
-                         ? "border-b-2 border-accent text-accent-foreground"
-                         : ""
-                     }`
-                  }
-                >
-                  <Avatar className="w-12 h-12 border border-border shadow-sm">
-                    <AvatarImage src={user.picture} alt={user.name} />
-                    <AvatarFallback
-                      className={`flex items-center justify-center font-medium ${getAvatarGradient(
-                        user.id
-                      )}`}
-                    >
-                      {user.name.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-xs text-muted-foreground truncate max-w-[60px] text-center">
-                    {user.name}
-                  </span>
-                </NavLink>
+            <div className="flex mb-4 space-x-1 overflow-x-auto flex-nowrap">
+              {pinnedUsers.map((user, index) => (
+                <div key={user.id} className="relative group">
+                  {" "}
+                  {/* Wrap in div with relative positioning */}
+                  <NavLink
+                    to={`chat/${user.id}`}
+                    className="flex flex-col items-center gap-1 p-1 rounded-sm transition-colors cursor-default"
+                  >
+                    {({ isActive }) => (
+                      <div className="flex flex-col items-center gap-1">
+                        <Avatar className="w-12 h-12 border border-border shadow-sm cursor-pointer">
+                          <AvatarImage src={user.picture} alt={user.name} />
+                          <AvatarFallback
+                            className={`flex items-center justify-center font-medium ${getAvatarGradient(
+                              index
+                            )}`}
+                          >
+                            {user.name.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+
+                        <span
+                          className={`text-xs truncate max-w-[60px] text-center block ${
+                            isActive
+                              ? "text-card-foreground border-b-2 border-accent"
+                              : "text-card-foreground"
+                          }`}
+                        >
+                          {user.name}
+                        </span>
+                      </div>
+                    )}
+                  </NavLink>
+                  {/* Unpin badge - appears on hover */}
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    onClick={(e) => {
+                      e.preventDefault(); // Prevent navigation
+                      removePin(user.id);
+                    }}
+                    className="absolute top-0 right-0 h-5 w-5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                    title="Unpin chat"
+                  >
+                    <X size={12} />
+                  </Button>
+                </div>
               ))}
             </div>
           )}
 
           {/* All Chats Header */}
           <div className="flex items-center justify-between mt-2 mb-2">
-            <span className="font-semibold text-foreground">
+            <span className="font-semibold">
               All Chats ({filteredChats.length})
             </span>
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full hover:bg-background hover:text-foreground w-7 h-7"
+              className="rounded-full w-7 h-7"
               onClick={() => setShowChats(!showChats)}
             >
               {showChats ? (
@@ -253,58 +295,90 @@ export default function ChatWindow() {
             </Button>
           </div>
 
-          {/* Chat List */}
+          {/* Scrollable Chat List */}
           {showChats && (
-            <div className="flex-1 h-screen overflow-y-auto scrollbar">
-              {filteredChats.map((chat) => {
-                const isActive = String(chat.id) === activeChatId;
-                return (
-                  <NavLink
-                    key={chat.id}
-                    to={`chat/${chat.id}`}
-                    className={({ isActive }) =>
-                      `flex items-center p-3 transition-colors rounded-md cursor-pointer 
-                       hover:bg-accent/10 last:mb-60 
-                       ${isActive ? "bg-accent/20 text-accent-content" : ""}`
-                    }
-                  >
-                    <Avatar className="w-12 h-12 border border-border shadow-sm">
-                      <AvatarImage src={chat.picture} alt={chat.name} />
-                      <AvatarFallback
-                        className={`flex items-center justify-center font-medium ${getAvatarGradient(
-                          chat.id
-                        )}`}
-                      >
-                        {chat.name.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
+            <div className="flex-1 overflow-y-auto pb-16 custom-scrollbar">
+              {filteredChats.map((chat, index) => (
+                <NavLink
+                  key={chat.id}
+                  to={`chat/${chat.id}`}
+                  className={({ isActive }) =>
+                    `flex items-center p-3 transition-colors rounded-md cursor-pointer hover:bg-accent/10 ${
+                      isActive ? "bg-accent/20 text-accent-content" : ""
+                    }`
+                  }
+                >
+                  <Avatar className="w-12 h-12 border border-border shadow-sm">
+                    <AvatarImage src={chat.picture} alt={chat.name} />
+                    <AvatarFallback
+                      className={`flex items-center justify-center font-medium ${getAvatarGradient(
+                        index
+                      )}`}
+                    >
+                      {chat.name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
 
-                    <div className="flex flex-col flex-1 ml-3 min-w-0">
-                      {/* Name + Timestamp */}
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-foreground">
-                          {chat.name}
-                        </span>
-                        <span
-                          className={`text-xs ${
-                            isActive ? "text-primary" : "text-muted-foreground"
-                          }`}
-                        >
-                          {chat.timestamp}
-                        </span>
-                      </div>
-                      {/* Last message */}
-                      <span
-                        className={`text-sm overflow-hidden whitespace-nowrap truncate ${
-                          isActive ? "text-primary" : "text-muted-foreground"
-                        }`}
-                      >
-                        {chat.lastMessage}
+                  <div className="flex flex-col flex-1 ml-3 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{chat.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {chat.timestamp}
                       </span>
                     </div>
-                  </NavLink>
-                );
-              })}
+                    <span className="text-sm overflow-hidden whitespace-nowrap truncate text-muted-foreground">
+                      {chat.lastMessage}
+                    </span>
+                  </div>
+
+                  {/* More menu */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="ml-2 h-8 w-8 rounded-full hover:bg-card 
+             focus-visible:ring-0 focus-visible:outline-none 
+             data-[state=open]:bg-transparent"
+                        onClick={(e) => e.preventDefault()} // prevent NavLink click
+                      >
+                        <MoreVertical className="h-5 w-5 text-card-foreground" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          if (pinnedUsers.some((user) => user.id === chat.id)) {
+                            removePin(chat.id);
+                          } else {
+                            addPin(chat);
+                          }
+                        }}
+                        className="flex items-center gap-2"
+                      >
+                        {pinnedUsers.some((user) => user.id === chat.id) ? (
+                          <>
+                            <PinOff size={16} className="text-primary" />
+                            <span>Unpin</span>
+                          </>
+                        ) : (
+                          <>
+                            <Pin size={16} className="text-primary" />
+                            <span>Pin</span>
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => deleteChat(chat.id)}
+                        className="flex items-center gap-2"
+                      >
+                        <Trash2 size={16} className="text-destructive" />
+                        <span>Delete</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </NavLink>
+              ))}
             </div>
           )}
         </div>
