@@ -45,23 +45,30 @@
   --radius: 0.625rem;
 
   /* General UI */
-  --background: #f9fafb; /* page bg light */
-  --foreground: #1f2937; /* page text light */
-  --card: #ffffff; /* card bg */
+  --background: #f9fafb;
+  /* page bg light */
+  --foreground: #1f2937;
+  /* page text light */
+  --card: #ffffff;
+  /* card bg */
   --card-foreground: #1f2937;
   --popover: #ffffff;
   --popover-foreground: #1f2937;
 
   /* Primary & Accent */
-  --primary: #3b82f6; /* buttons primary */
+  --primary: #3b82f6;
+  /* buttons primary */
   --primary-foreground: #ffffff;
-  --secondary: #06b6d4; /* links / secondary actions */
+  --secondary: #06b6d4;
+  /* links / secondary actions */
   --secondary-foreground: #ffffff;
   --muted: #e5e7eb;
   --muted-foreground: #1f2937;
-  --accent: #06b6d4; /* professional accent */
+  --accent: #06b6d4;
+  /* professional accent */
   --accent-foreground: #ffffff;
-  --destructive: #ef4444; /* red alerts */
+  --destructive: #ef4444;
+  /* red alerts */
 
   /* Borders & Input */
   --border: #d1d5db;
@@ -128,7 +135,61 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* ✅ Reusable scrollbar utility */
+@layer utilities {
+  .custom-scrollbar {
+    /* Light mode colors */
+    --scrollbar-track: #ffffff;
+    --scrollbar-thumb: #06b6d4;
+    --scrollbar-hover: #06b6d4;
+    --scrollbar-active: #06b6d4;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+      height: 4px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: var(--scrollbar-track);
+      border-radius: 8px;
+      margin: 2px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: 8px;
+      border: 1px solid transparent;
+      background-clip: padding-box;
+      min-height: 20px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: var(--scrollbar-hover);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    }
+
+    &::-webkit-scrollbar-thumb:active {
+      background: var(--scrollbar-active);
+    }
+
+    &::-webkit-scrollbar-corner {
+      background: var(--scrollbar-track);
+      border-radius: 8px;
+    }
+  }
+
+  /* Dark mode overrides */
+  .dark .custom-scrollbar {
+    --scrollbar-track: #1e1e2f;
+    --scrollbar-thumb: #06b6d4;
+    --scrollbar-hover: #06b6d4;
+    --scrollbar-active: #06b6d4;
   }
 }
