@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/atoms/Avatar";
 import {
@@ -55,6 +55,7 @@ function getAvatarGradient(idx) {
 
 /* ------------------ Component ------------------ */
 export default function ChatWindow() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [showPinned, setShowPinned] = useState(true);
   const [pinnedUsers, setPinnedUsers] = useState([
@@ -189,6 +190,10 @@ export default function ChatWindow() {
 
     // Also remove from pinned users if it exists there
     setPinnedUsers((prev) => prev.filter((user) => user.id !== chatId));
+  };
+
+  const closeChat = () => {
+    navigate(-1);
   };
 
   return (
@@ -374,6 +379,13 @@ export default function ChatWindow() {
                       >
                         <Trash2 size={16} className="text-destructive" />
                         <span>Delete</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => closeChat()}
+                        className="flex items-center gap-2"
+                      >
+                        <X size={16} className="text-primary" />
+                        <span>Close</span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

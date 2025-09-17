@@ -1,19 +1,22 @@
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/atoms/Avatar";
-import { useState } from "react";
+import { Input } from "@/components/atoms/Input";
+import { Button } from "@/components/atoms/Button";
+import { EmojiPopover } from "@/components/molecules/EmojiPopover";
+import { MediaPickerPopover } from "@/components/molecules/MediaPickerPopover";
 import {
   Mic,
   MoreHorizontal,
-  Paperclip,
   Phone,
+  Play,
   Search,
   Send,
-  Smile,
   Video,
 } from "lucide-react";
-import { Input } from "../atoms/Input";
-import { Button } from "../atoms/Button";
+import { MediaGallery } from "@/components/organisms/MediaGallery";
 
+// Sample chat list
 const chats = [
   {
     id: 1,
@@ -38,37 +41,150 @@ const chats = [
   },
 ];
 
-// Dummy messages
+// Initial messages
 const initialMessages = [
   {
     id: 1,
     text: "Hey",
     sender: "other",
     timestamp: new Date("2025-09-08T09:15:05"),
+    media: [],
   },
   {
     id: 2,
-    text: "How are you?",
+    text: "Check out these files",
     sender: "other",
     timestamp: new Date("2025-09-08T09:15:40"),
+    media: [
+      {
+        type: "image",
+        url: "https://images.unsplash.com/photo-1538998073820-4dfa76300194?q=80&w=300",
+      },
+      {
+        type: "image",
+        url: "https://images.unsplash.com/photo-1538998073820-4dfa76300194?q=80&w=300",
+      },
+      {
+        type: "image",
+        url: "https://images.unsplash.com/photo-1538998073820-4dfa76300194?q=80&w=300",
+      },
+      {
+        type: "image",
+        url: "https://images.unsplash.com/photo-1538998073820-4dfa76300194?q=80&w=300",
+      },
+      {
+        type: "image",
+        url: "https://images.unsplash.com/photo-1538998073820-4dfa76300194?q=80&w=300",
+      },
+      {
+        type: "image",
+        url: "https://images.unsplash.com/photo-1538998073820-4dfa76300194?q=80&w=300",
+      },
+      {
+        type: "image",
+        url: "https://images.unsplash.com/photo-1538998073820-4dfa76300194?q=80&w=300",
+      },
+    ],
   },
   {
     id: 3,
-    text: "I’m good",
+    text: "I’m good, thanks!",
     sender: "me",
     timestamp: new Date("2025-09-08T09:16:10"),
+    media: [
+      {
+        type: "video",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
+        poster:
+          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
+      },
+      {
+        type: "video",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
+        poster:
+          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
+      },
+      {
+        type: "video",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
+        poster:
+          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
+      },
+      {
+        type: "video",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
+        poster:
+          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
+      },
+      {
+        type: "video",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
+        poster:
+          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
+      },
+      {
+        type: "video",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
+        poster:
+          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
+      },
+    ],
   },
   {
     id: 4,
-    text: "Working on project",
-    sender: "me",
-    timestamp: new Date("2025-09-08T09:16:55"),
+    text: "Check out these files",
+    sender: "other",
+    timestamp: new Date("2025-09-08T09:15:40"),
+    media: [
+      {
+        type: "video",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
+        poster:
+          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
+      },
+      {
+        type: "video",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
+        poster:
+          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
+      },
+      {
+        type: "video",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
+        poster:
+          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
+      },
+      {
+        type: "video",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
+        poster:
+          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
+      },
+      {
+        type: "video",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
+        poster:
+          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
+      },
+      {
+        type: "video",
+        url: "https://www.w3schools.com/html/mov_bbb.mp4",
+        poster:
+          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
+      },
+    ],
   },
   {
     id: 5,
-    text: "Nice, keep me posted",
-    sender: "other",
-    timestamp: new Date("2025-09-08T09:18:20"),
+    text: "I’m good, thanks!",
+    sender: "me",
+    timestamp: new Date("2025-09-08T09:16:10"),
+    media: [
+      {
+        type: "image",
+        url: "https://images.unsplash.com/photo-1538998073820-4dfa76300194?q=80&w=300",
+      },
+    ],
   },
 ];
 
@@ -76,32 +192,50 @@ const formatTime = (date) =>
   date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
 export default function ChatDetail() {
-  const { chatId } = useParams();
+  const { chatId } = useParams(); // replace with router param if using Next.js
   const chat = chats.find((c) => c.id.toString() === chatId);
 
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState(initialMessages);
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [galleryMedia, setGalleryMedia] = useState([]);
+  const [galleryStartIndex, setGalleryStartIndex] = useState(0);
 
-  const handleSend = () => {
-    if (!message.trim()) return;
+  const handleOpenGallery = (msgMedia, startIndex = 0) => {
+    const formattedMedia = msgMedia.map((m, i) => ({
+      id: i,
+      type: m.type,
+      src: m.url,
+      thumbnail: m.poster || m.url,
+    }));
+
+    setGalleryMedia(formattedMedia);
+    setGalleryStartIndex(startIndex);
+    setIsGalleryOpen(true);
+  };
+
+  const handleSend = (mediaFiles = []) => {
+    if (!message.trim() && mediaFiles.length === 0) return;
+
     setMessages([
       ...messages,
-      { id: Date.now(), text: message, sender: "me", timestamp: new Date() },
+      {
+        id: Date.now(),
+        text: message,
+        sender: "me",
+        timestamp: new Date(),
+        media: mediaFiles,
+      },
     ]);
     setMessage("");
   };
 
-  const formatLastSeen = (date) => {
-    return date.toLocaleString("en-US", {
+  const formatLastSeen = (date) =>
+    date.toLocaleString("en-US", {
       weekday: "short",
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
-
-  if (!chat) {
-    return <div className="p-4">Chat not found</div>;
-  }
 
   return (
     <div className="h-full flex flex-col pb-1">
@@ -118,7 +252,7 @@ export default function ChatDetail() {
             <span className="font-semibold text-foreground max-w-48 truncate">
               {chat.name}
             </span>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-secondary">
               {chat.isOnline
                 ? "Online"
                 : `Last seen ${formatLastSeen(chat.lastSeen)}`}
@@ -134,7 +268,7 @@ export default function ChatDetail() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 bg-background overflow-y-auto p-4 space-y-3 custom-scrollbar">
+      <div className="flex-1 bg-background overflow-y-auto p-4 space-y-2 custom-scrollbar">
         {messages.map((msg, i) => {
           const isLastInMinute =
             !messages[i + 1] ||
@@ -145,73 +279,120 @@ export default function ChatDetail() {
               key={msg.id}
               className={`flex flex-col ${
                 msg.sender === "me" ? "items-end" : "items-start"
-              }`}
+              } space-y-1`}
             >
-              {/* bubble */}
+              {/* Message text */}
               <div
-                className={`relative max-w-xs px-3 py-2 rounded-lg ${
+                className={`max-w-xs px-3 py-2 rounded-lg ${
                   msg.sender === "me"
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-foreground"
                 }`}
               >
                 {msg.text}
-
-                {/* incoming bubble ke andar right-bottom time */}
-                {msg.sender === "other" && isLastInMinute && (
-                  <span className="absolute -bottom-5 right-0 text-xs text-muted-foreground">
-                    {formatTime(msg.timestamp)}
-                  </span>
-                )}
               </div>
 
-              {/* outgoing ke liye time bubble ke niche */}
-              {msg.sender === "me" && isLastInMinute && (
-                <span className="text-xs text-muted-foreground mt-1 self-end">
+              {/* Media */}
+              {msg.media && msg.media.length > 0 && (
+                <div className="mt-1 flex gap-2">
+                  {(() => {
+                    const visible = msg.media.slice(0, 5);
+                    const remaining = msg.media.length - visible.length;
+
+                    return visible.map((m, idx) => (
+                      <div
+                        key={idx}
+                        className="relative w-16 h-16 rounded overflow-hidden flex items-center justify-center
+                   bg-[theme('colors.bg')] dark:bg-[theme('colors.bg-dark')] cursor-pointer"
+                        onClick={() => handleOpenGallery(msg.media, idx)} // open at clicked media
+                      >
+                        {m.type === "image" && (
+                          <img
+                            src={m.url}
+                            alt="Shared Image"
+                            className="w-full h-full object-cover rounded"
+                          />
+                        )}
+
+                        {m.type === "video" && (
+                          <div
+                            className="relative w-full h-full cursor-pointer"
+                            onClick={() => handleOpenGallery(msg.media, idx)}
+                          >
+                            <img
+                              src={m.poster}
+                              alt="Video thumbnail"
+                              className="w-full h-full object-cover rounded"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <Play className="w-5 h-5 text-white opacity-80 pointer-events-none" />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* +X more */}
+                        {idx === visible.length - 1 && remaining > 0 && (
+                          <div
+                            className="absolute inset-0 flex items-center justify-center rounded
+               bg-muted text-muted-foreground text-sm font-medium cursor-pointer"
+                            onClick={() =>
+                              handleOpenGallery(msg.media, visible.length)
+                            } // dynamic
+                          >
+                            +{remaining}
+                          </div>
+                        )}
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
+
+              {/* Timestamp */}
+              {isLastInMinute && (
+                <div
+                  className={`text-xs text-muted-foreground mt-1 ${
+                    msg.sender === "me" ? "text-right" : "text-left"
+                  }`}
+                >
                   {formatTime(msg.timestamp)}
-                </span>
+                </div>
               )}
             </div>
           );
         })}
       </div>
 
-      {/* Bottom Panel */}
+      {/* Bottom panel */}
       <div className="p-2 flex items-center gap-2">
-        {/* Attach */}
-        <button className="p-2 text-muted-foreground hover:text-foreground cursor-pointer">
-          <Paperclip className="w-5 h-5" />
-        </button>
-
-        {/* Emoji */}
-        <button className="p-2 text-muted-foreground hover:text-foreground cursor-pointer">
-          <Smile className="w-5 h-5" />
-        </button>
-
-        {/* Mic */}
+        <MediaPickerPopover onSelect={(mediaFiles) => handleSend(mediaFiles)} />
+        <EmojiPopover onSelect={(emoji) => setMessage(message + emoji)} />
         <button className="p-2 text-muted-foreground hover:text-foreground cursor-pointer">
           <Mic className="w-5 h-5" />
         </button>
-
-        {/* Input */}
         <Input
           type="text"
           placeholder="Type a message..."
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
           className="flex-1"
         />
-
-        {/* Send */}
         <Button
-          onClick={handleSend}
+          onClick={() => handleSend()}
           size="icon"
-          className="rounded-full cursor-pointer"
+          className="rounded-full cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90"
         >
           <Send className="w-5 h-5" />
         </Button>
       </div>
+      {isGalleryOpen && (
+        <MediaGallery
+          media={galleryMedia}
+          initialIndex={galleryStartIndex}
+          isOpen={isGalleryOpen}
+          setIsOpen={setIsGalleryOpen}
+        />
+      )}
     </div>
   );
 }
