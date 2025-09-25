@@ -20,7 +20,7 @@ export function MediaPickerPopover({ onSelect }) {
       id: Date.now() + i, // unique id
       file,
       type: file.type.startsWith("image") ? "image" : "video",
-      src: URL.createObjectURL(file),
+      url: URL.createObjectURL(file),
       thumbnail: file.type.startsWith("image")
         ? null
         : URL.createObjectURL(file),

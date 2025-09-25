@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/atoms/Avatar";
 import { Input } from "@/components/atoms/Input";
@@ -197,9 +197,18 @@ export default function ChatDetail() {
 
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState(initialMessages);
+
+  const messagesEndRef = useRef(null);
+
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryMedia, setGalleryMedia] = useState([]);
   const [galleryStartIndex, setGalleryStartIndex] = useState(0);
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
 
   const handleOpenGallery = (msgMedia, startIndex = 0) => {
     const formattedMedia = msgMedia.map((m, i) => ({
@@ -282,15 +291,17 @@ export default function ChatDetail() {
               } space-y-1`}
             >
               {/* Message text */}
-              <div
-                className={`max-w-xs px-3 py-2 rounded-lg ${
-                  msg.sender === "me"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-foreground"
-                }`}
-              >
-                {msg.text}
-              </div>
+              {msg?.text && (
+                <div
+                  className={`max-w-xs px-3 py-2 rounded-lg ${
+                    msg.sender === "me"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-foreground"
+                  }`}
+                >
+                  {msg.text}
+                </div>
+              )}
 
               {/* Media */}
               {msg.media && msg.media.length > 0 && (
@@ -361,6 +372,8 @@ export default function ChatDetail() {
             </div>
           );
         })}
+        <div ref={messagesEndRef} />
+        {/* Spacer element at the bottom to scroll into view */}
       </div>
 
       {/* Bottom panel */}
