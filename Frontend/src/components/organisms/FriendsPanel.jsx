@@ -3,6 +3,7 @@ import { Input } from "../atoms/Input";
 import { Button } from "../atoms/Button";
 import { Avatar, AvatarFallback, AvatarImage } from "../atoms/Avatar";
 import AddFriendModal from "./AddFriend";
+import { getAvatarGradient } from "@/lib/colorGradient";
 
 const friendsData = [
   { _id: 1, name: "Sophia Carter", username: "sophia.carter" },
@@ -27,22 +28,6 @@ export default function FriendsPanel() {
   const [friends, setFriends] = useState(friendsData);
   const [isModalOpen, setModalOpen] = useState(false);
   const [menuOpenFor, setMenuOpenFor] = useState(null); // Track which friend's menu is open
-
-  const avatarGradients = [
-    "bg-gradient-to-r from-pink-500 to-red-500 text-white",
-    "bg-gradient-to-r from-indigo-500 to-blue-500 text-white",
-    "bg-gradient-to-r from-green-400 to-emerald-600 text-white",
-    "bg-gradient-to-r from-purple-500 to-pink-600 text-white",
-    "bg-gradient-to-r from-orange-400 to-red-500 text-white",
-    "bg-gradient-to-r from-teal-400 to-cyan-500 text-white",
-    "bg-gradient-to-r from-amber-500 to-yellow-400 text-black",
-    "bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white",
-    "bg-gradient-to-r from-lime-400 to-green-600 text-black",
-  ];
-
-  function getAvatarGradient(id) {
-    return avatarGradients[id % avatarGradients.length];
-  }
 
   function handleUnfollow(id) {
     setFriends((prev) => prev.filter((friend) => friend._id !== id));
