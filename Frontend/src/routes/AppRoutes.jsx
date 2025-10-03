@@ -1,8 +1,5 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
-// Routes wrapper
-import ProtectedRoute from "./ProtectedRoute";
-
 // Layout
 import MainLayout from "@/components/templates/MainLayout";
 
@@ -11,31 +8,27 @@ import Account from "@/pages/Account";
 import Notification from "@/pages/Notification";
 import Personalization from "@/pages/Personalization";
 import Help from "@/pages/Help";
+import { Call } from "@/pages/Call";
 import Dashboard from "@/pages/Dashboard";
 
 // Panels
 import ChatWindow from "@/components/organisms/ChatWindow";
 import ChatDetail from "@/components/organisms/ChatDetail";
-import CallsPanel from "@/components/organisms/CallsPanel";
 import FriendsPanel from "@/components/organisms/FriendsPanel";
 
+// Calls
+import { CallHistoryPage } from "@/components/templates/CallHistoryPage";
+
 const router = createBrowserRouter([
-  // Protected routes with layout
   {
     path: "/",
-    element: (
-      // <ProtectedRoute>
-      <MainLayout />
-      // </ProtectedRoute>
-    ),
-
+    element: <MainLayout />,
     children: [
       {
         path: "/",
         element: <ChatWindow />,
         children: [{ path: ":chat/:chatId", element: <ChatDetail /> }],
       },
-      { path: "calls", element: <CallsPanel /> },
       { path: "friends", element: <FriendsPanel /> },
       {
         path: "dashboard",
@@ -45,6 +38,16 @@ const router = createBrowserRouter([
           { path: "notification", element: <Notification /> },
           { path: "personalization", element: <Personalization /> },
           { path: "help", element: <Help /> },
+        ],
+      },
+
+      // 🚀 Calls section
+      {
+        path: "calls",
+        element: <Call />,
+        children: [
+          { index: true, element: <CallHistoryPage /> },
+          { path: ":id", element: <CallHistoryPage /> },
         ],
       },
     ],
