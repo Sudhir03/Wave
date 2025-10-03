@@ -1,20 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useOutletContext, useParams } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/atoms/Avatar";
 import { Input } from "@/components/atoms/Input";
 import { Button } from "@/components/atoms/Button";
 import { EmojiPopover } from "@/components/molecules/EmojiPopover";
 import { MediaPickerPopover } from "@/components/molecules/MediaPickerPopover";
-import {
-  Mic,
-  MoreHorizontal,
-  Phone,
-  Play,
-  Search,
-  Send,
-  Video,
-} from "lucide-react";
+import { BellOff, Phone, Pin, PinOff, Send, UserX, Video } from "lucide-react";
 import { MediaGallery } from "@/components/organisms/MediaGallery";
+import { ImageAttachment } from "@/components/molecules/media/ImageAttachment";
+import { VideoAttachment } from "@/components/molecules/media/VideoAttachment";
+import { DocumentAttachment } from "@/components/molecules/media/DocumentAttachment";
+import { AudioPlayer } from "@/components/molecules/media/AudioPlayer";
+import { VoicePlayer } from "@/components/molecules/media/VoicePlayer";
+import { VoiceMessageSender } from "@/components/molecules/VoiceMessageSender";
+import { ChatSearch } from "../molecules/ChatSearch";
+import { MoreOptionsPopover } from "../molecules/MoreOptionsPopover";
 
 // Sample chat list
 const chats = [
@@ -192,7 +192,18 @@ const formatTime = (date) =>
   date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
 export default function ChatDetail() {
-  const { chatId } = useParams(); // replace with router param if using Next.js
+  const { chatId } = useParams();
+
+  const {
+    pinnedUsers,
+    addPin,
+    removePin,
+    mutedUsers,
+    toggleMute,
+    blockedUsers,
+    toggleBlock,
+  } = useOutletContext();
+
   const chat = chats.find((c) => c.id.toString() === chatId);
 
   const [message, setMessage] = useState("");
@@ -203,6 +214,8 @@ export default function ChatDetail() {
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryMedia, setGalleryMedia] = useState([]);
   const [galleryStartIndex, setGalleryStartIndex] = useState(0);
+
+  const [activeMediaId, setActiveMediaId] = useState(null);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -269,10 +282,44 @@ export default function ChatDetail() {
           </div>
         </div>
         <div className="flex items-center gap-3 text-foreground">
-          <Search className="w-5 h-5 cursor-pointer" />
+          <ChatSearch messages={messages} />
           <Phone className="w-5 h-5 cursor-pointer" />
           <Video className="w-5 h-5 cursor-pointer" />
-          <MoreHorizontal className="w-5 h-5 cursor-pointer" />
+
+          <MoreOptionsPopover
+            options={[
+              {
+                label: pinnedUsers.some((u) => u.id === chat.id)
+                  ? "Unpin"
+                  : "Pin",
+                icon: {
+                  component: pinnedUsers.some((u) => u.id === chat.id)
+                    ? PinOff
+                    : Pin,
+                },
+                onClick: () => {
+                  if (pinnedUsers.some((u) => u.id === chat.id))
+                    removePin(chat.id);
+                  else
+                    addPin({
+                      id: chat.id,
+                      name: chat.name,
+                      picture: chat.picture,
+                    });
+                },
+              },
+              {
+                label: mutedUsers.includes(chat.id) ? "Unmute" : "Mute",
+                icon: { component: BellOff },
+                onClick: () => toggleMute(chat),
+              },
+              {
+                label: blockedUsers.includes(chat.id) ? "Unblock" : "Block",
+                icon: { component: UserX, props: { color: "red" } },
+                onClick: () => toggleBlock(chat),
+              },
+            ]}
+          />
         </div>
       </div>
 
@@ -286,6 +333,7 @@ export default function ChatDetail() {
           return (
             <div
               key={msg.id}
+              id={`message-${msg.id}`}
               className={`flex flex-col ${
                 msg.sender === "me" ? "items-end" : "items-start"
               } space-y-1`}
@@ -305,58 +353,103 @@ export default function ChatDetail() {
 
               {/* Media */}
               {msg.media && msg.media.length > 0 && (
-                <div className="mt-1 flex gap-2">
-                  {(() => {
-                    const visible = msg.media.slice(0, 5);
-                    const remaining = msg.media.length - visible.length;
+                <>
+                  {/* Images + Videos (grid style) */}
+                  <div className="mt-1 flex gap-2 flex-wrap">
+                    {msg.media
+                      .filter((m) => m.type === "image" || m.type === "video")
+                      .slice(0, 5)
+                      .map((m, idx, arr) => {
+                        const remaining =
+                          msg.media.filter(
+                            (x) => x.type === "image" || x.type === "video"
+                          ).length - arr.length;
 
-                    return visible.map((m, idx) => (
-                      <div
-                        key={idx}
-                        className="relative w-16 h-16 rounded overflow-hidden flex items-center justify-center
-                   bg-[theme('colors.bg')] dark:bg-[theme('colors.bg-dark')] cursor-pointer"
-                        onClick={() => handleOpenGallery(msg.media, idx)} // open at clicked media
-                      >
-                        {m.type === "image" && (
-                          <img
-                            src={m.url}
-                            alt="Shared Image"
-                            className="w-full h-full object-cover rounded"
-                          />
-                        )}
-
-                        {m.type === "video" && (
-                          <div
-                            className="relative w-full h-full cursor-pointer"
-                            onClick={() => handleOpenGallery(msg.media, idx)}
-                          >
-                            <img
-                              src={m.poster}
-                              alt="Video thumbnail"
-                              className="w-full h-full object-cover rounded"
+                        if (m.type === "image") {
+                          return (
+                            <ImageAttachment
+                              key={idx}
+                              url={m.url}
+                              onClick={() => handleOpenGallery(msg.media, idx)}
+                              showRemaining={
+                                idx === arr.length - 1 && remaining > 0
+                              }
+                              remaining={remaining}
                             />
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <Play className="w-5 h-5 text-white opacity-80 pointer-events-none" />
-                            </div>
-                          </div>
-                        )}
+                          );
+                        }
 
-                        {/* +X more */}
-                        {idx === visible.length - 1 && remaining > 0 && (
-                          <div
-                            className="absolute inset-0 flex items-center justify-center rounded
-               bg-muted text-muted-foreground text-sm font-medium cursor-pointer"
-                            onClick={() =>
-                              handleOpenGallery(msg.media, visible.length)
-                            } // dynamic
-                          >
-                            +{remaining}
-                          </div>
-                        )}
-                      </div>
-                    ));
-                  })()}
-                </div>
+                        if (m.type === "video") {
+                          return (
+                            <VideoAttachment
+                              key={idx}
+                              poster={m.poster}
+                              onClick={() => handleOpenGallery(msg.media, idx)}
+                              showRemaining={
+                                idx === arr.length - 1 && remaining > 0
+                              }
+                              remaining={remaining}
+                            />
+                          );
+                        }
+
+                        return null;
+                      })}
+                  </div>
+
+                  {/* Docs / Audio / Voice (list style) */}
+                  <div className="mt-2 flex flex-col gap-2">
+                    {msg.media
+                      .filter(
+                        (m) =>
+                          m.type === "document" ||
+                          m.type === "audio" ||
+                          m.type === "voice"
+                      )
+                      .map((m, idx) => {
+                        if (m.type === "document") {
+                          console.log(m);
+
+                          return (
+                            <DocumentAttachment
+                              key={idx}
+                              fileName={m.fileName}
+                              fileSize={m.fileSize}
+                              url={m.url}
+                            />
+                          );
+                        }
+
+                        if (m.type === "audio") {
+                          console.log(m);
+
+                          return (
+                            <AudioPlayer
+                              key={idx}
+                              fileName={m.fileName}
+                              fileSize={m.fileSize}
+                              audioUrl={m.url}
+                              isActive={
+                                activeMediaId === `audio-${msg.id}-${idx}`
+                              }
+                              onPlay={() =>
+                                setActiveMediaId(`audio-${msg.id}-${idx}`)
+                              }
+                              onMenuClick={() =>
+                                console.log("Audio menu clicked")
+                              }
+                            />
+                          );
+                        }
+
+                        if (m.type === "voice") {
+                          return <VoicePlayer key={idx} audioSrc={m.url} />;
+                        }
+
+                        return null;
+                      })}
+                  </div>
+                </>
               )}
 
               {/* Timestamp */}
@@ -380,9 +473,9 @@ export default function ChatDetail() {
       <div className="p-2 flex items-center gap-2">
         <MediaPickerPopover onSelect={(mediaFiles) => handleSend(mediaFiles)} />
         <EmojiPopover onSelect={(emoji) => setMessage(message + emoji)} />
-        <button className="p-2 text-muted-foreground hover:text-foreground cursor-pointer">
-          <Mic className="w-5 h-5" />
-        </button>
+        <VoiceMessageSender
+          onVoiceSend={(mediaItem) => handleSend([mediaItem])}
+        />
         <Input
           type="text"
           placeholder="Type a message..."

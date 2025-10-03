@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import { useState } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/atoms/Avatar";
 import {
@@ -17,6 +17,9 @@ import {
   PinOff,
   Pin,
   Trash2,
+  UserX,
+  VolumeX,
+  Volume,
 } from "lucide-react";
 
 import aliceImg from "@/assets/images/alice.jpg";
@@ -55,6 +58,7 @@ function getAvatarGradient(idx) {
 
 /* ------------------ Component ------------------ */
 export default function ChatWindow() {
+  const { chatId } = useParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [showPinned, setShowPinned] = useState(true);
@@ -63,6 +67,8 @@ export default function ChatWindow() {
     { id: 2, name: "Bob", picture: "" },
     { id: 3, name: "Charlie", picture: "" },
   ]);
+  const [mutedUsers, setMutedUsers] = useState([]);
+  const [blockedUsers, setBlockedUsers] = useState([]);
   const [showChats, setShowChats] = useState(true);
   const [chats, setChats] = useState([
     {
@@ -74,7 +80,7 @@ export default function ChatWindow() {
     },
     {
       id: 2,
-      name: "Bob",
+      name: "Sudhir Sharma",
       picture: "",
       lastMessage: "Let's meet tomorrow",
       timestamp: formatTimestamp("2025-08-20T19:20:00"),
@@ -176,6 +182,10 @@ export default function ChatWindow() {
     chat.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  const visibleChats = filteredChats.filter(
+    (chat) => !blockedUsers.includes(chat.id)
+  );
+
   const addPin = (chatToPin) => {
     setPinnedUsers((pinnedUsers) => [chatToPin, ...pinnedUsers]);
   };
@@ -184,16 +194,35 @@ export default function ChatWindow() {
     setPinnedUsers((prev) => prev.filter((user) => user.id !== userId));
   };
 
+  const toggleMute = (chat) => {
+    setMutedUsers((prev) =>
+      prev.includes(chat.id)
+        ? prev.filter((id) => id !== chat.id)
+        : [...prev, chat.id]
+    );
+  };
+
+  const toggleBlock = (chat) => {
+    setBlockedUsers((prev) => {
+      if (prev.includes(chat.id)) {
+        // Unblock
+        return prev.filter((id) => id !== chat.id);
+      } else {
+        // Block → remove from pinned
+        setPinnedUsers((pins) => pins.filter((user) => user.id !== chat.id));
+        return [...prev, chat.id];
+      }
+    });
+  };
+
   const deleteChat = (chatId) => {
-    // Remove from chats array
     setChats((prev) => prev.filter((chat) => chat.id !== chatId));
 
-    // Also remove from pinned users if it exists there
     setPinnedUsers((prev) => prev.filter((user) => user.id !== chatId));
   };
 
   const closeChat = () => {
-    navigate(-1);
+    navigate("/", { replace: true });
   };
 
   return (
@@ -232,7 +261,6 @@ export default function ChatWindow() {
             <div className="flex mb-4 space-x-1 overflow-x-auto flex-nowrap">
               {pinnedUsers.map((user, index) => (
                 <div key={user.id} className="relative group">
-                  {" "}
                   {/* Wrap in div with relative positioning */}
                   <NavLink
                     to={`chat/${user.id}`}
@@ -284,7 +312,7 @@ export default function ChatWindow() {
           {/* All Chats Header */}
           <div className="flex items-center justify-between mt-2 mb-2">
             <span className="font-semibold">
-              All Chats ({filteredChats.length})
+              All Chats ({visibleChats.length})
             </span>
             <Button
               variant="ghost"
@@ -303,7 +331,7 @@ export default function ChatWindow() {
           {/* Scrollable Chat List */}
           {showChats && (
             <div className="flex-1 overflow-y-auto pb-16 custom-scrollbar">
-              {filteredChats.map((chat, index) => (
+              {visibleChats.map((chat, index) => (
                 <NavLink
                   key={chat.id}
                   to={`chat/${chat.id}`}
@@ -326,7 +354,14 @@ export default function ChatWindow() {
 
                   <div className="flex flex-col flex-1 ml-3 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className="font-medium">{chat.name}</span>
+                      {/* <span className="font-medium">{chat.name}</span> */}
+                      <span
+                        className="font-medium truncate block max-w-[80px]"
+                        title={chat.name}
+                      >
+                        {chat.name.split(" ").slice(0, 2).join(" ")}
+                      </span>
+
                       <span className="text-xs text-muted-foreground">
                         {chat.timestamp}
                       </span>
@@ -336,13 +371,18 @@ export default function ChatWindow() {
                     </span>
                   </div>
 
+                  {/* Muted Badge Icon */}
+                  {mutedUsers.includes(chat.id) && (
+                    <VolumeX className="w-4 h-4 text-gray-400" />
+                  )}
+
                   {/* More menu */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="ml-2 h-8 w-8 rounded-full hover:bg-card 
+                        className="h-8 w-8 rounded-full hover:bg-card 
              focus-visible:ring-0 focus-visible:outline-none 
              data-[state=open]:bg-transparent"
                         onClick={(e) => e.preventDefault()} // prevent NavLink click
@@ -350,7 +390,9 @@ export default function ChatWindow() {
                         <MoreVertical className="h-5 w-5 text-card-foreground" />
                       </Button>
                     </DropdownMenuTrigger>
+
                     <DropdownMenuContent align="end">
+                      {/* Pin/Unpin */}
                       <DropdownMenuItem
                         onClick={() => {
                           if (pinnedUsers.some((user) => user.id === chat.id)) {
@@ -373,6 +415,37 @@ export default function ChatWindow() {
                           </>
                         )}
                       </DropdownMenuItem>
+
+                      {/* Mute / Unmute */}
+                      <DropdownMenuItem
+                        onClick={() => toggleMute(chat)}
+                        className="flex items-center gap-2"
+                      >
+                        {mutedUsers.includes(chat.id) ? (
+                          <>
+                            <Volume size={16} className="text-green-600" />
+                            <span>Unmute</span>
+                          </>
+                        ) : (
+                          <>
+                            <VolumeX size={16} className="text-red-600" />
+                            <span>Mute</span>
+                          </>
+                        )}
+                      </DropdownMenuItem>
+
+                      {/* Block (only if not already blocked) */}
+                      {!blockedUsers.includes(chat.id) && (
+                        <DropdownMenuItem
+                          onClick={() => toggleBlock(chat)}
+                          className="flex items-center gap-2"
+                        >
+                          <UserX size={16} className="text-red-600" />
+                          <span>Block</span>
+                        </DropdownMenuItem>
+                      )}
+
+                      {/* Delete */}
                       <DropdownMenuItem
                         onClick={() => deleteChat(chat.id)}
                         className="flex items-center gap-2"
@@ -380,13 +453,17 @@ export default function ChatWindow() {
                         <Trash2 size={16} className="text-destructive" />
                         <span>Delete</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => closeChat()}
-                        className="flex items-center gap-2"
-                      >
-                        <X size={16} className="text-primary" />
-                        <span>Close</span>
-                      </DropdownMenuItem>
+
+                      {/* Close (only if active chat) */}
+                      {chatId === String(chat.id) && (
+                        <DropdownMenuItem
+                          onClick={() => closeChat()}
+                          className="flex items-center gap-2"
+                        >
+                          <X size={16} className="text-primary" />
+                          <span>Close</span>
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </NavLink>
@@ -398,7 +475,17 @@ export default function ChatWindow() {
 
       {/* Right Panel */}
       <div className="flex-1">
-        <Outlet />
+        <Outlet
+          context={{
+            pinnedUsers,
+            addPin,
+            removePin,
+            mutedUsers,
+            toggleMute,
+            blockedUsers,
+            toggleBlock,
+          }}
+        />
       </div>
     </div>
   );
