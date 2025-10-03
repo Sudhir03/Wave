@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/atoms/Button";
 import { Label } from "@/components/atoms/Label";
-import { Input } from "../atoms/Input";
+import { Input } from "@/components/atoms/Input";
 import { Paperclip, Headphones, FileTextIcon, ImageIcon } from "lucide-react";
 
 export function MediaPickerPopover({ onSelect }) {
@@ -17,13 +17,12 @@ export function MediaPickerPopover({ onSelect }) {
     if (!files || files.length === 0) return;
 
     const mediaFiles = Array.from(files).map((file, i) => ({
-      id: Date.now() + i, // unique id
-      file,
+      id: Date.now() + i,
       type: file.type.startsWith("image") ? "image" : "video",
-      src: URL.createObjectURL(file),
-      thumbnail: file.type.startsWith("image")
-        ? null
-        : URL.createObjectURL(file),
+      url: URL.createObjectURL(file),
+      poster: file.type.startsWith("image") ? null : URL.createObjectURL(file),
+      fileName: file.name,
+      fileSize: `${Math.round(file.size / 1024)} KB`,
     }));
 
     onSelect(mediaFiles);
@@ -33,13 +32,30 @@ export function MediaPickerPopover({ onSelect }) {
   // Handles audio and documents separately
   const handleFile = (file, type) => {
     if (!file) return;
-    onSelect([
-      {
+
+    let mediaItem = null;
+
+    if (type === "audio") {
+      mediaItem = {
         id: Date.now(),
-        file,
-        type,
-      },
-    ]);
+        type: "audio",
+        fileName: file.name,
+        fileSize: `${Math.round(file.size / 1024)} KB`,
+        url: URL.createObjectURL(file),
+      };
+    }
+
+    if (type === "document") {
+      mediaItem = {
+        id: Date.now(),
+        type: "document",
+        fileName: file.name,
+        fileSize: `${Math.round(file.size / 1024)} KB`,
+        url: URL.createObjectURL(file),
+      };
+    }
+
+    onSelect([mediaItem]);
     setOpen(false);
   };
 

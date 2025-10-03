@@ -149,7 +149,7 @@ export function MediaGallery({ media, initialIndex, isOpen, setIsOpen }) {
             <img
               src={currentMedia.src}
               alt="Shared Media"
-              className="max-w-full max-h-[90vh] object-contain"
+              className="max-w-full max-h-[85vh] object-contain"
             />
           )}
           {currentMedia.type === "video" && (
@@ -158,7 +158,7 @@ export function MediaGallery({ media, initialIndex, isOpen, setIsOpen }) {
               ref={videoRef}
               src={currentMedia.src}
               muted={isMuted}
-              className="max-w-full max-h-[90vh] object-contain cursor-pointer"
+              className="max-w-full max-h-[85vh] object-contain cursor-pointer"
               onClick={togglePlay}
             />
           )}
