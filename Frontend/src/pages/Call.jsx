@@ -13,50 +13,88 @@ export const Call = () => {
 
   const calls = [
     {
-      id: "1",
+      _id: "1",
       name: "Alice",
       type: "voice",
       img: "/avatars/1.png",
       callStatus: "missed",
-      date: "2025-09-18T14:32:00",
+      date: "2025-10-03T14:32:00",
+      duration: "5m 23s",
     },
     {
-      id: "2",
+      _id: "2",
       name: "Bob",
       type: "video",
       img: "/avatars/2.png",
       callStatus: "ongoing",
-      date: "2025-09-18T15:10:00",
+      date: "2025-10-03T15:10:00",
+      duration: "12m 45s",
     },
     {
-      id: "3",
+      _id: "3",
       name: "Charlie",
       type: "voice",
       img: "/avatars/3.png",
       callStatus: "incoming",
-      date: "2025-09-17T18:45:00",
+      date: "2025-10-02T18:45:00",
+      duration: "8m 10s",
     },
     {
-      id: "4",
+      _id: "4",
       name: "Diana",
       type: "video",
       img: "/avatars/4.png",
       callStatus: "missed",
-      date: "2025-09-16T21:05:00",
+      date: "2025-09-30T21:05:00",
+      duration: "25m 0s",
     },
   ];
 
+  // Filter by type
   const filteredCalls =
     filter === "all" ? calls : calls.filter((c) => c.type === filter);
 
-  return (
-    <div className="flex-col ">
-      {/* Sidebar */}
-      <div className="flex justify-between items-center bg-card sticky top-0 z-10 py-4 px-6 border-b border-border">
-        {/* Title */}
-        <h1 className="text-xl font-bold text-foreground">Call History</h1>
+  // Filter by search
+  const searchedCalls = filteredCalls.filter((c) =>
+    c.name.toLowerCase().includes(search.toLowerCase())
+  );
 
-        {/* Search input with icon button */}
+  // ✅ Group calls by day with Today/Yesterday
+  const groupCallsByDay = (calls) => {
+    return calls.reduce((acc, call) => {
+      const date = new Date(call.date);
+      const today = new Date();
+      const yesterday = new Date();
+      yesterday.setDate(today.getDate() - 1);
+
+      let dayLabel;
+      if (date.toDateString() === today.toDateString()) {
+        dayLabel = "Today";
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        dayLabel = "Yesterday";
+      } else {
+        dayLabel = date.toLocaleDateString([], {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+      }
+
+      if (!acc[dayLabel]) acc[dayLabel] = [];
+      acc[dayLabel].push(call);
+      return acc;
+    }, {});
+  };
+
+  const groupedCalls = groupCallsByDay(
+    searchedCalls.sort((a, b) => new Date(b.date) - new Date(a.date))
+  );
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Top Bar */}
+      <div className="flex justify-between items-center bg-card sticky top-0 z-10 py-4 px-6 border-b border-border">
+        <h1 className="text-xl font-bold text-foreground">Call History</h1>
         <div className="flex w-full max-w-md gap-2">
           <Input
             placeholder="Search History..."
@@ -69,14 +107,16 @@ export const Call = () => {
           </Button>
         </div>
       </div>
-      <div className="flex ">
-        <aside className="w-72 border-r border-border  flex flex-col">
+
+      <div className="flex flex-1 h-[calc(100%-72px)]">
+        {/* Left Sidebar */}
+        <aside className="w-80 border-r border-border flex flex-col overflow-y-auto p-4 ">
           {/* Filter Nav */}
-          <div className="flex justify-around p-2">
+          <div className="flex justify-around border-b py-2 ">
             <button
               onClick={() => setFilter("all")}
               className={cn(
-                "px-3 py-1 rounded-md text-sm border-b-2 border-transparent hover:border-primary",
+                "px-3 py-1 rounded-md text-sm border-b-2 border-transparent hover:border-primary cursor-pointer",
                 filter === "all" && "border-primary text-primary"
               )}
             >
@@ -85,7 +125,7 @@ export const Call = () => {
             <button
               onClick={() => setFilter("voice")}
               className={cn(
-                "px-3 py-1 rounded-md text-sm border-b-2 border-transparent hover:border-primary",
+                "px-3 py-1 rounded-md text-sm border-b-2 border-transparent hover:border-primary cursor-pointer",
                 filter === "voice" && "border-primary text-primary"
               )}
             >
@@ -94,7 +134,7 @@ export const Call = () => {
             <button
               onClick={() => setFilter("video")}
               className={cn(
-                "px-3 py-1 rounded-md text-sm border-b-2 border-transparent hover:border-primary",
+                "px-3 py-1 rounded-md text-sm border-b-2 border-transparent hover:border-primary cursor-pointer",
                 filter === "video" && "border-primary text-primary"
               )}
             >
@@ -102,16 +142,23 @@ export const Call = () => {
             </button>
           </div>
 
-          {/* Call history list */}
-          <ul className="flex-1 overflow-y-auto p-4 space-y-2">
-            {filteredCalls.map((c, index) => (
-              <ContactItem c={c} index={index} />
-            ))}
-          </ul>
+          {/* Call history grouped by day */}
+          {Object.entries(groupedCalls).map(([day, calls]) => (
+            <div key={day} className="py-2">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                {day}
+              </h3>
+              <ul className="space-y-2">
+                {calls.map((c, index) => (
+                  <ContactItem key={c._id} c={c} index={index} />
+                ))}
+              </ul>
+            </div>
+          ))}
         </aside>
 
-        {/* Right side */}
-        <main className="flex-1">
+        {/* Right Panel */}
+        <main className="flex-1 overflow-auto py-2">
           <Outlet />
         </main>
       </div>

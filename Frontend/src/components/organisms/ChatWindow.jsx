@@ -358,7 +358,7 @@ export default function ChatWindow() {
 
                   {/* Muted Badge Icon */}
                   {mutedUsers.includes(chat.id) && (
-                    <VolumeX className="w-4 h-4 text-gray-400" />
+                    <VolumeX className="w-4 h-4 text-primary" />
                   )}
 
                   {/* More menu */}

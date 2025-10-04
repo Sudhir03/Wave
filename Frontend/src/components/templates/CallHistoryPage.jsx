@@ -2,9 +2,9 @@ import { useParams } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "../atoms/Avatar";
 import { Phone, Video } from "lucide-react";
 import { useState } from "react";
-import { VideoCallPage } from "./VideoCallPage";
-import { VoiceCallPage } from "./VoiceCallPage";
 import { getAvatarGradient } from "@/lib/colorGradient";
+import { VideoCallWindow } from "../organisms/VideoCallWindow";
+import { NormalCallCard } from "../organisms/NormalCallCard";
 
 const callHistory = {
   1: [
@@ -73,13 +73,13 @@ export const CallHistoryPage = () => {
         {/* Voice & Video Buttons */}
         <div className="flex gap-2">
           <button
-            className="p-2 rounded-full bg-gray-200 hover:bg-gray-300"
+            className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 cursor-pointer"
             onClick={() => openModal("voice")}
           >
             <Phone className="w-5 h-5" />
           </button>
           <button
-            className="p-2 rounded-full bg-gray-200 hover:bg-gray-300"
+            className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 cursor-pointer"
             onClick={() => openModal("video")}
           >
             <Video className="w-5 h-5" />
@@ -132,12 +132,21 @@ export const CallHistoryPage = () => {
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full bg-white rounded-lg overflow-hidden">
+          <div className="w-full h-full">
             {callType === "voice" && (
-              <VoiceCallPage contact={contact} closeModal={closeModal} />
+              <NormalCallCard
+                name={contact.name}
+                img={contact.img}
+                onEnd={closeModal}
+              />
             )}
             {callType === "video" && (
-              <VideoCallPage contact={contact} closeModal={closeModal} />
+              <VideoCallWindow
+                callerName="Sarah Connor"
+                localVideoSrc="https://www.w3schools.com/html/mov_bbb.mp4"
+                remoteVideoSrc="https://www.w3schools.com/html/movie.mp4"
+                onEnd={closeModal}
+              />
             )}
           </div>
         </div>
