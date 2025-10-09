@@ -1,6 +1,6 @@
 import { useParams } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "../atoms/Avatar";
-import { Phone, Video } from "lucide-react";
+import { Phone, Video, XCircle } from "lucide-react";
 import { useState } from "react";
 import { getAvatarGradient } from "@/lib/colorGradient";
 import { VideoCallWindow } from "../organisms/VideoCallWindow";
@@ -11,7 +11,7 @@ const callHistory = {
     { type: "voice", date: "2025-09-17 14:32", duration: "5m 23s" },
     { type: "video", date: "2025-09-16 18:10", duration: "12m 45s" },
   ],
-  2: [{ type: "voice", date: "2025-09-15 09:20", duration: "3m 11s" }],
+  2: [{ type: "missed", date: "2025-09-15 09:20", duration: "3m 11s" }],
   3: [],
   4: [{ type: "video", date: "2025-09-12 21:05", duration: "25m 0s" }],
 };
@@ -88,7 +88,7 @@ export const CallHistoryPage = () => {
       </div>
 
       {/* Call History */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         {history.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-6">
             No calls yet.
@@ -103,9 +103,11 @@ export const CallHistoryPage = () => {
                 {/* Left side: icon + date */}
                 <div className="flex items-center gap-2">
                   {call.type === "voice" ? (
-                    <Phone className="w-5 h-5 text-gray-600" />
+                    <Phone className="w-5 h-5 text-green-500" />
+                  ) : call.type === "video" ? (
+                    <Video className="w-5 h-5 text-blue-500" />
                   ) : (
-                    <Video className="w-5 h-5 text-gray-600" />
+                    <XCircle className="w-5 h-5 text-red-400" />
                   )}
                   <span className="text-sm text-muted-foreground">
                     {new Date(call.date).toLocaleString([], {
