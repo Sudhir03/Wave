@@ -41,70 +41,74 @@ export default function FriendsPanel() {
   );
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex justify-between items-center bg-card sticky top-0 z-10 py-4 border-b border-border -mt-6">
+    <div className="flex flex-col h-full">
+      {/* Header: sticky */}
+      <div className="flex justify-between items-center bg-card sticky top-0 z-10 py-4 px-6 border-b border-border">
         <h1 className="text-xl font-bold text-foreground">Friends</h1>
         <div className="flex gap-2 w-full max-w-md">
           <Input
             placeholder="Search Friends..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            className="flex-1"
           />
           <Button onClick={() => setModalOpen(true)}>Add</Button>
         </div>
       </div>
 
-      {/* Friends List */}
-      <div className="mt-4">
-        {filteredFriends.map((friend) => (
-          <div
-            key={friend._id}
-            className="flex items-center justify-between gap-3 py-2 border-b border-border relative"
-          >
-            <div className="flex items-center gap-3">
-              <Avatar className="w-12 h-12">
-                <AvatarImage src={friend.picture} alt={friend.name} />
-                <AvatarFallback className={getAvatarGradient(friend._id)}>
-                  {friend.name.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <div className="font-semibold text-foreground">
-                  {friend.name}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  @{friend.username}
+      {/* Scrollable Friends List */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar ">
+        {filteredFriends.length > 0 ? (
+          filteredFriends.map((friend) => (
+            <div
+              key={friend._id}
+              className="flex items-center justify-between gap-3 py-2 border-b border-border relative"
+            >
+              <div className="flex items-center gap-3">
+                <Avatar className="w-12 h-12">
+                  <AvatarImage src={friend.picture} alt={friend.name} />
+                  <AvatarFallback className={getAvatarGradient(friend._id)}>
+                    {friend.name.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <div className="font-semibold text-foreground">
+                    {friend.name}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    @{friend.username}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Three dots menu button */}
-            <div className="relative">
-              <button
-                onClick={() =>
-                  setMenuOpenFor(menuOpenFor === friend._id ? null : friend._id)
-                }
-                className="p-2 rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
-              >
-                ⋮
-              </button>
+              {/* Three dots menu button */}
+              <div className="relative">
+                <button
+                  onClick={() =>
+                    setMenuOpenFor(
+                      menuOpenFor === friend._id ? null : friend._id
+                    )
+                  }
+                  className="p-2 rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
+                >
+                  ⋮
+                </button>
 
-              {/* Menu */}
-              {menuOpenFor === friend._id && (
-                <div className="absolute right-0 mt-2 w-32 bg-card border border-border rounded shadow-lg z-20">
-                  <button
-                    onClick={() => handleUnfollow(friend._id)}
-                    className="block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  >
-                    Unfollow
-                  </button>
-                </div>
-              )}
+                {/* Menu */}
+                {menuOpenFor === friend._id && (
+                  <div className="absolute right-0 mt-2 w-32 bg-card border border-border rounded shadow-lg z-20">
+                    <button
+                      onClick={() => handleUnfollow(friend._id)}
+                      className="block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      Unfollow
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
-        {filteredFriends.length === 0 && (
+          ))
+        ) : (
           <div className="text-muted-foreground">No friends found</div>
         )}
       </div>
