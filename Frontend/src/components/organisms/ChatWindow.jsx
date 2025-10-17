@@ -208,7 +208,7 @@ export default function ChatWindow() {
   };
 
   const closeChat = () => {
-    navigate("/", { replace: true });
+    navigate(-1);
   };
 
   return (
@@ -320,7 +320,7 @@ export default function ChatWindow() {
               {visibleChats.map((chat, index) => (
                 <NavLink
                   key={chat.id}
-                  to={`chat/${chat.id}`}
+                  to={`/chat/${chat.id}`}
                   className={({ isActive }) =>
                     `flex items-center p-3 transition-colors rounded-md cursor-pointer hover:bg-accent/10 ${
                       isActive ? "bg-accent/20 text-accent-content" : ""

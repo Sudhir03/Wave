@@ -5,7 +5,7 @@ import { Input } from "@/components/atoms/Input";
 import { Button } from "@/components/atoms/Button";
 import { EmojiPopover } from "@/components/molecules/EmojiPopover";
 import { MediaPickerPopover } from "@/components/molecules/MediaPickerPopover";
-import { BellOff, Phone, Pin, PinOff, Send, UserX, Video } from "lucide-react";
+import { BellOff, Pin, PinOff, Send, UserX } from "lucide-react";
 import { MediaGallery } from "@/components/organisms/MediaGallery";
 import { ImageAttachment } from "@/components/molecules/media/ImageAttachment";
 import { VideoAttachment } from "@/components/molecules/media/VideoAttachment";
@@ -13,8 +13,9 @@ import { DocumentAttachment } from "@/components/molecules/media/DocumentAttachm
 import { AudioPlayer } from "@/components/molecules/media/AudioPlayer";
 import { VoicePlayer } from "@/components/molecules/media/VoicePlayer";
 import { VoiceMessageSender } from "@/components/molecules/VoiceMessageSender";
-import { ChatSearch } from "../molecules/ChatSearch";
-import { MoreOptionsPopover } from "../molecules/MoreOptionsPopover";
+import { ChatSearch } from "@/components/molecules/ChatSearch";
+import { MoreOptionsPopover } from "@/components/molecules/MoreOptionsPopover";
+import { CallPopover } from "@/components/molecules/CallPopover";
 
 // Sample chat list
 const chats = [
@@ -281,10 +282,12 @@ export default function ChatDetail() {
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-3 text-foreground">
+        <div className="flex items-center text-foreground">
           <ChatSearch messages={messages} />
-          <Phone className="w-5 h-5 cursor-pointer" />
-          <Video className="w-5 h-5 cursor-pointer" />
+
+          <CallPopover type="audio" />
+
+          <CallPopover type="video" />
 
           <MoreOptionsPopover
             options={[
