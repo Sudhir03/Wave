@@ -25,6 +25,10 @@ const router = createBrowserRouter([
     element: <MainLayout />,
     children: [
       {
+        index: true,
+        element: <ChatWindow />,
+      },
+      {
         path: "/",
         element: <ChatWindow />,
         children: [{ path: ":chat/:chatId", element: <ChatDetail /> }],
@@ -40,8 +44,6 @@ const router = createBrowserRouter([
           { path: "help", element: <Help /> },
         ],
       },
-
-      // 🚀 Calls section
       {
         path: "calls",
         element: <Call />,

@@ -91,55 +91,46 @@ export const Call = () => {
   );
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Top Bar */}
-      <div className="flex justify-between items-center bg-card sticky top-0 z-10 py-4 px-6 border-b border-border">
-        <h1 className="text-xl font-bold text-foreground">Call History</h1>
-        <div className="flex w-full max-w-md gap-2">
+    <div className="flex h-full overflow-hidden">
+      {/* Left Panel */}
+      <div className="w-80 h-full flex flex-col bg-background text-foreground border-r-2 border-border">
+        {/* Search */}
+        <div className="p-4 bg-card text-card-foreground">
           <Input
-            placeholder="Search History..."
+            placeholder="Search calls..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1"
           />
-          <Button className="p-2" variant="default">
-            <Search className="w-5 h-5 text-muted-foreground" />
-          </Button>
         </div>
-      </div>
 
-      <div className="flex flex-1 h-[calc(100%-72px)]">
-        {/* Left Sidebar */}
-        <aside className="w-80 border-r border-border flex flex-col overflow-y-auto p-4 ">
+        {/* Calls History */}
+        <div className="p-4 bg-card text-card-foreground border-t-2 border-border flex-1 flex flex-col overflow-hidden">
           {/* Filter Nav */}
-          <div className="flex justify-around border-b py-2 ">
-            <button
+          <div className="flex items-center justify-evenly mb-2">
+            <Button
               onClick={() => setFilter("all")}
-              className={cn(
-                "px-3 py-1 rounded-md text-sm border-b-2 border-transparent hover:border-primary cursor-pointer",
-                filter === "all" && "border-primary text-primary"
-              )}
+              className={`${
+                filter === "all" ? "" : "bg-card text-card-foreground"
+              }`}
             >
               All
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setFilter("voice")}
-              className={cn(
-                "px-3 py-1 rounded-md text-sm border-b-2 border-transparent hover:border-primary cursor-pointer",
-                filter === "voice" && "border-primary text-primary"
-              )}
+              className={`${
+                filter === "voice" ? " " : "bg-card text-card-foreground"
+              }`}
             >
               Voice
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setFilter("video")}
-              className={cn(
-                "px-3 py-1 rounded-md text-sm border-b-2 border-transparent hover:border-primary cursor-pointer",
-                filter === "video" && "border-primary text-primary"
-              )}
+              className={`${
+                filter === "video" ? " " : "bg-card text-card-foreground"
+              }`}
             >
               Video
-            </button>
+            </Button>
           </div>
 
           {/* Call history grouped by day */}
@@ -155,13 +146,13 @@ export const Call = () => {
               </ul>
             </div>
           ))}
-        </aside>
-
-        {/* Right Panel */}
-        <main className="flex-1 overflow-auto py-2">
-          <Outlet />
-        </main>
+        </div>
       </div>
+
+      {/* Right Panel */}
+      <main className="flex-1 overflow-auto py-2">
+        <Outlet />
+      </main>
     </div>
   );
 };

@@ -24,6 +24,7 @@ import {
 
 import aliceImg from "@/assets/images/alice.jpg";
 import { getAvatarGradient } from "@/lib/colorGradient";
+import EmptyChatScreen from "./EmptyChatScreen";
 
 /* ------------------ Helper ------------------ */
 function formatTimestamp(date) {
@@ -460,17 +461,21 @@ export default function ChatWindow() {
 
       {/* Right Panel */}
       <div className="flex-1">
-        <Outlet
-          context={{
-            pinnedUsers,
-            addPin,
-            removePin,
-            mutedUsers,
-            toggleMute,
-            blockedUsers,
-            toggleBlock,
-          }}
-        />
+        {chatId ? (
+          <Outlet
+            context={{
+              pinnedUsers,
+              addPin,
+              removePin,
+              mutedUsers,
+              toggleMute,
+              blockedUsers,
+              toggleBlock,
+            }}
+          />
+        ) : (
+          <EmptyChatScreen />
+        )}
       </div>
     </div>
   );
