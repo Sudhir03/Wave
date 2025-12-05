@@ -11,11 +11,14 @@ const rateLimit = require("express-rate-limit");
 // =======================
 const AppError = require("./utils/appError");
 const globalErrorHandler = require("./controllers/errorController");
-const { log } = require("winston");
 
 // =======================
 // Routes
 // =======================
+
+const userRoutes = require("./routes/userRoutes");
+const friendRequestRoutes = require("./routes/friendRequestRoutes");
+const friendRoutes = require("./routes/friendRoutes");
 
 const app = express();
 
@@ -71,6 +74,10 @@ app.get("/api/v1/health", (req, res) => {
 // =======================
 // Application Routes
 // =======================
+
+app.use("/api/users", userRoutes);
+app.use("/api/friend-requests", friendRequestRoutes);
+app.use("/api/friends", friendRoutes);
 
 // =======================
 // Handle Unmatched Routes
