@@ -190,68 +190,79 @@ export const Call = () => {
   );
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Left Panel */}
-      <div className="w-80 h-full flex flex-col bg-background text-foreground border-r-2 border-border">
-        {/* Search */}
-        <div className="p-4 bg-card text-card-foreground">
+    <div className="flex flex-col h-full">
+      {/* Top Bar */}
+      <div className="flex justify-between items-center bg-card sticky top-0 z-10 py-4 px-6 border-b border-border">
+        <h1 className="text-xl font-bold text-foreground">Call History</h1>
+        <div className="flex w-full max-w-md gap-2">
           <Input
-            placeholder="Search calls..."
+            placeholder="Search History..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            className="flex-1"
           />
+          <Button className="p-2" variant="default">
+            <Search className="w-5 h-5 text-muted-foreground" />
+          </Button>
         </div>
+      </div>
 
       <div className="flex flex-1 h-[calc(100%-72px)]">
         {/* Left Sidebar */}
         <aside className="w-80 border-r border-border flex flex-col">
           {/* Filter Nav */}
-          <div className="flex justify-around border-b py-2 ">
+          <div className="flex justify-around border-b py-2 px-4 shrink-0 bg-card z-10">
             <button
               onClick={() => setFilter("all")}
-              className={`${
-                filter === "all" ? "" : "bg-card text-card-foreground"
-              }`}
+              className={cn(
+                "px-3 py-1 rounded-md text-sm border-b-2 border-transparent hover:border-primary cursor-pointer",
+                filter === "all" && "border-primary text-primary"
+              )}
             >
               All
-            </Button>
-            <Button
+            </button>
+            <button
               onClick={() => setFilter("voice")}
-              className={`${
-                filter === "voice" ? " " : "bg-card text-card-foreground"
-              }`}
+              className={cn(
+                "px-3 py-1 rounded-md text-sm border-b-2 border-transparent hover:border-primary cursor-pointer",
+                filter === "voice" && "border-primary text-primary"
+              )}
             >
               Voice
-            </Button>
-            <Button
+            </button>
+            <button
               onClick={() => setFilter("video")}
-              className={`${
-                filter === "video" ? " " : "bg-card text-card-foreground"
-              }`}
+              className={cn(
+                "px-3 py-1 rounded-md text-sm border-b-2 border-transparent hover:border-primary cursor-pointer",
+                filter === "video" && "border-primary text-primary"
+              )}
             >
               Video
-            </Button>
+            </button>
           </div>
 
-          {/* Call history grouped by day */}
-          {Object.entries(groupedCalls).map(([day, calls]) => (
-            <div key={day} className="py-2">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                {day}
-              </h3>
-              <ul className="space-y-2">
-                {calls.map((c, index) => (
-                  <ContactItem key={c._id} c={c} index={index} />
-                ))}
-              </ul>
-            </div>
-          ))}
+          {/* Scrollable Call History */}
+          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+            {Object.entries(groupedCalls).map(([day, calls]) => (
+              <div key={day} className="py-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                  {day}
+                </h3>
+                <ul className="space-y-2">
+                  {calls.map((c, index) => (
+                    <ContactItem key={c._id} c={c} index={index} />
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </aside>
 
-      {/* Right Panel */}
-      <main className="flex-1 overflow-auto py-2">
-        <Outlet />
-      </main>
+        {/* Right Panel */}
+        <main className="flex-1 overflow-auto py-2">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 };
