@@ -35,9 +35,11 @@ exports.sendFriendRequest = catchAsync(async (req, res) => {
   });
 
   if (alreadyRequested) {
-    return res
-      .status(400)
-      .json({ isSuccess: false, message: "Friend request already exists" });
+    return res.status(400).json({
+      isSuccess: false,
+      message: "Friend request already exists",
+      request: alreadyRequested,
+    });
   }
 
   const request = await FriendRequest.create({ senderId, receiverId });
@@ -45,6 +47,52 @@ exports.sendFriendRequest = catchAsync(async (req, res) => {
   return res
     .status(201)
     .json({ isSuccess: true, message: "Friend request sent", request });
+});
+
+exports.cancelFriendRequest = catchAsync(async (req, res) => {
+  const senderId = req.userId;
+  const { id: requestId } = req.params;
+
+  const request = await FriendRequest.findOne({
+    _id: requestId,
+    senderId,
+  });
+
+  if (!request) {
+    return res
+      .status(404)
+      .json({ isSuccess: false, message: "Friend request not found" });
+  }
+
+  await FriendRequest.deleteOne({ _id: requestId });
+
+  return res.status(200).json({
+    isSuccess: true,
+    message: "Friend request cancelled",
+  });
+});
+
+exports.getSentRequests = catchAsync(async (req, res) => {
+  const senderId = req.userId;
+
+  const requests = await FriendRequest.find({ senderId }).populate(
+    "receiverId",
+    "fullName username profileImageUrl"
+  );
+
+  const formatted = requests.map((r) => ({
+    id: r._id,
+    receiverId: r.receiverId._id,
+    fullName: r.receiverId.fullName,
+    username: r.receiverId.username,
+    profileImageUrl: r.receiverId.profileImageUrl,
+  }));
+
+  return res.status(200).json({
+    isSuccess: true,
+    results: formatted.length,
+    requests: formatted,
+  });
 });
 
 exports.getPendingRequests = catchAsync(async (req, res) => {
@@ -57,6 +105,7 @@ exports.getPendingRequests = catchAsync(async (req, res) => {
 
   const formattedRequests = requests.map((r) => ({
     id: r._id,
+    senderId: r.senderId._id, // ⬅️ IMPORTANT for incomingMap
     fullName: r.senderId.fullName,
     username: r.senderId.username,
     profileImageUrl: r.senderId.profileImageUrl,

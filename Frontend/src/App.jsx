@@ -5,6 +5,8 @@ import {
   useAuth,
 } from "@clerk/clerk-react";
 import AppRoutes from "@/routes/AppRoutes";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { useEffect } from "react";
 
 function App() {
@@ -22,6 +24,7 @@ function App() {
     <>
       <SignedIn>
         <AppRoutes />
+        <ToastContainer position="top-right" autoClose={2500} limit={1} />
       </SignedIn>
 
       <SignedOut>
