@@ -12,7 +12,12 @@ import { Pencil, X, Loader2 } from "lucide-react";
 import { ProfilePhotoUpload } from "@/components/molecules/ProfilePhotoUpload";
 import { ChangePasswordModal } from "@/components/molecules/ConfirmPasswordModal";
 
-import { getMyProfile, updateMyProfile, updateMyAvatar } from "@/api/users";
+import {
+  getMyProfile,
+  updateMyProfile,
+  updateMyAvatar,
+  updateMyPassword,
+} from "@/api/users";
 import { Skeleton } from "../ui/skeleton";
 
 export function AccountForm() {
@@ -49,7 +54,6 @@ export function AccountForm() {
       firstName: user.firstName || "",
       lastName: user.lastName || "",
       email: user.email || "",
-      currentPassword: "",
       newPassword: "",
       confirmNewPassword: "",
     };
@@ -114,40 +118,39 @@ export function AccountForm() {
     },
   });
 
-  /* ------------------ PASSWORD (CLERK FRONTEND) ------------------ */
+  /* ------------------ PASSWORD ------------------ */
   const { mutate: changePassword, isPending: isPasswordUpdating } = useMutation(
     {
-      mutationFn: async ({ currentPassword, newPassword }) => {
-        if (!isClerkLoaded || !clerkUser) throw new Error("Clerk not ready");
-
-        return clerkUser.updatePassword({
-          currentPassword,
-          newPassword,
-        });
+      mutationFn: async ({ newPassword }) => {
+        const token = await getToken();
+        return updateMyPassword({ token, newPassword });
       },
-      onSuccess: () => {
-        toast.success("Password updated.");
+      onSuccess: (res) => {
+        toast.success(res?.message || "Password updated successfully", {
+          toastId: "password-update-success",
+        });
         setIsPasswordModalOpen(false);
-        reset((old) => ({
-          ...old,
-          currentPassword: "",
+        // clear form fields
+        reset({
           newPassword: "",
           confirmNewPassword: "",
-        }));
+        });
+        // optional: refresh user profile
+        queryClient.invalidateQueries({ queryKey: ["myProfile"] });
       },
       onError: (err) => {
-        console.log(err);
-
-        toast.error(err?.errors?.[0]?.message || err?.message || "Failed");
+        toast.error(
+          err?.response?.data?.message ||
+            err?.message ||
+            "Failed to update password",
+          { toastId: "password-update-error" }
+        );
       },
     }
   );
 
-  const handlePasswordSubmit = (data) => {
-    changePassword({
-      currentPassword: data.currentPassword,
-      newPassword: data.newPassword,
-    });
+  const onPasswordSubmit = (data) => {
+    changePassword({ newPassword: data.newPassword });
   };
 
   /* ------------------ UI ------------------ */
@@ -262,7 +265,7 @@ export function AccountForm() {
           register={register}
           errors={errors}
           newPassword={watch("newPassword")}
-          onSubmit={handleSubmit(handlePasswordSubmit)}
+          onSubmit={handleSubmit(onPasswordSubmit)}
           onClose={() => setIsPasswordModalOpen(false)}
           isUpdating={isPasswordUpdating}
         />
