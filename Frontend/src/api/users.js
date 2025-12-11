@@ -34,6 +34,19 @@ export const updateMyAvatar = async ({ token, file }) => {
   return res.data;
 };
 
+export const updateMyPassword = async ({ token, newPassword }) => {
+  const res = await api.patch(
+    "/users/me/password",
+    { newPassword },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return res.data;
+};
+
 export const searchUsers = async ({ query, token }) => {
   const res = await api.get(`/users/search?q=${encodeURIComponent(query)}`, {
     headers: {

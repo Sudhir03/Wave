@@ -21,6 +21,8 @@ router.patch(
   userController.updateAvatar
 );
 
+router.patch("/me/password", requireAuth, userController.updatePassword);
+
 router.get("/search", requireAuth, userController.searchUsers);
 
 module.exports = router;

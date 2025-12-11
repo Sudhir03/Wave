@@ -193,6 +193,54 @@ exports.updateAvatar = catchAsync(async (req, res) => {
   });
 });
 
+exports.updatePassword = catchAsync(async (req, res) => {
+  const { userId } = req;
+  const { newPassword } = req.body;
+
+  if (
+    !newPassword ||
+    typeof newPassword !== "string" ||
+    newPassword.trim().length < 8
+  ) {
+    return res.status(400).json({
+      isSuccess: false,
+      message: "newPassword is required and must be at least 8 characters",
+    });
+  }
+
+  const userDoc = await User.findById(userId);
+  if (!userDoc) {
+    return res.status(404).json({
+      isSuccess: false,
+      message: "User not found",
+    });
+  }
+
+  const clerkUserId = userDoc.clerkUserId;
+  if (!clerkUserId) {
+    return res.status(400).json({
+      isSuccess: false,
+      message: "User is missing clerkUserId",
+    });
+  }
+
+  try {
+    await clerkClient.users.updateUser(clerkUserId, {
+      password: newPassword,
+    });
+
+    return res.status(200).json({
+      isSuccess: true,
+      message: "Password updated successfully",
+    });
+  } catch (err) {
+    return res.status(400).json({
+      isSuccess: false,
+      message: err?.errors?.[0]?.message || "Failed to update password",
+    });
+  }
+});
+
 exports.searchUsers = catchAsync(async (req, res, next) => {
   const { q } = req.query;
   const { userId: currentUserId } = req;
