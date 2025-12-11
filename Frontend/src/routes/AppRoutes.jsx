@@ -1,4 +1,8 @@
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import {
+  createBrowserRouter,
+  Navigate,
+  RouterProvider,
+} from "react-router-dom";
 
 // Layout
 import MainLayout from "@/components/templates/MainLayout";
@@ -24,12 +28,13 @@ const router = createBrowserRouter([
     path: "/",
     element: <MainLayout />,
     children: [
+      { index: true, element: <Navigate to="/chat" replace /> },
       {
-        path: "/",
+        path: "chat",
         element: <ChatWindow />,
-        children: [{ path: ":chat/:chatId", element: <ChatDetail /> }],
+        children: [{ path: ":chatId", element: <ChatDetail /> }],
       },
-      { path: "friends", element: <FriendsPanel /> },
+      { path: "friend", element: <FriendsPanel /> },
       {
         path: "dashboard",
         element: <Dashboard />,
@@ -40,10 +45,8 @@ const router = createBrowserRouter([
           { path: "help", element: <Help /> },
         ],
       },
-
-      // 🚀 Calls section
       {
-        path: "calls",
+        path: "call",
         element: <Call />,
         children: [
           { index: true, element: <CallHistoryPage /> },

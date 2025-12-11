@@ -9,9 +9,9 @@ export default function Sidebar() {
   const navigate = useNavigate();
 
   const links = [
-    { to: "/", icon: MessageSquare },
-    { to: "/calls", icon: Phone },
-    { to: "/friends", icon: Users },
+    { to: "/chat", icon: MessageSquare },
+    { to: "/call", icon: Phone },
+    { to: "/friend", icon: Users },
   ];
 
   const isActiveLink = (to) => {

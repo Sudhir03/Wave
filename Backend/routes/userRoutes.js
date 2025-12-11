@@ -1,0 +1,26 @@
+const express = require("express");
+const multer = require("multer");
+
+const userController = require("../controllers/userController");
+const { requireAuth } = require("../middlewares/requireAuth");
+
+const router = express.Router();
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+router.post("/sync", userController.clerkUserSync);
+
+router.get("/me", requireAuth, userController.getMe);
+
+router.patch("/me", requireAuth, userController.updateMe);
+
+router.patch(
+  "/me/avatar",
+  requireAuth,
+  upload.single("avatar"),
+  userController.updateAvatar
+);
+
+router.get("/search", requireAuth, userController.searchUsers);
+
+module.exports = router;

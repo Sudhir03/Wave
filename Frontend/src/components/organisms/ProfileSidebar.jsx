@@ -1,15 +1,16 @@
 import { useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { Button } from "../atoms/Button";
 import { User, Bell, Sliders, HelpCircle, LogOut } from "lucide-react";
 import ConfirmationModal from "../molecules/ConfirmationModal";
+import { useClerk } from "@clerk/clerk-react";
 
-function ProfileSidebar({ onLogout }) {
+function ProfileSidebar() {
   const [isConfirmOpen, setConfirmOpen] = useState(false);
-  const navigate = useNavigate();
+  const { signOut } = useClerk();
 
   const handleLogout = () => {
-    navigate("/signup");
+    signOut({ redirectUrl: "/" });
     setConfirmOpen(false);
   };
 
@@ -27,11 +28,6 @@ function ProfileSidebar({ onLogout }) {
     },
     { to: "help", text: "Help", icon: <HelpCircle className="w-4 h-4" /> },
   ];
-
-  const handleLogoutConfirm = () => {
-    setConfirmOpen(false);
-    if (onLogout) onLogout(); // call actual logout logic
-  };
 
   return (
     <div className="w-[30%] border-r-2 border-border py-4 flex flex-col justify-between h-full">
@@ -59,7 +55,7 @@ function ProfileSidebar({ onLogout }) {
       {/* Logout Button */}
       <div className="px-3 mt-4">
         <Button
-          variant="ghost"
+          variant="outline"
           className="w-full justify-start flex items-center gap-2 text-red-500 hover:bg-red-400"
           onClick={() => setConfirmOpen(true)}
         >

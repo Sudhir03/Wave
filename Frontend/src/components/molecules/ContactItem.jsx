@@ -1,5 +1,5 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/atoms/Avatar";
-import { Phone, User, Video } from "lucide-react";
+import { Phone, Video } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { getAvatarGradient } from "@/lib/colorGradient";
@@ -8,7 +8,7 @@ export function ContactItem({ c, index }) {
   const navigate = useNavigate();
   return (
     <NavLink
-      to={`/calls/${c._id}`}
+      to={`/call/${c._id}`}
       // onClick={(e) => {
       //   e.preventDefault();
       //   navigate(`/calls/${c._id}`, { replace: true });

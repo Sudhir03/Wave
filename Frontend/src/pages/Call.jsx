@@ -211,7 +211,7 @@ export const Call = () => {
         {/* Left Sidebar */}
         <aside className="w-80 border-r border-border flex flex-col">
           {/* Filter Nav */}
-          <div className="flex justify-around border-b py-2 px-4 flex-shrink-0 bg-card z-10">
+          <div className="flex justify-around border-b py-2 px-4 shrink-0 bg-card z-10">
             <button
               onClick={() => setFilter("all")}
               className={cn(

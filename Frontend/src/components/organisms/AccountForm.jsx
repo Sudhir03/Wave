@@ -1,325 +1,271 @@
-import React, { useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
-import { ProfilePhotoUpload } from "@/components/molecules/ProfilePhotoUpload";
+import React, { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth, useUser } from "@clerk/clerk-react";
+import { toast } from "react-toastify";
+
 import { Input } from "@/components/atoms/Input";
 import { Button } from "@/components/atoms/Button";
-import { Pencil, X } from "lucide-react";
+import { Spinner } from "@/components/atoms/Spinner";
+import { Pencil, X, Loader2 } from "lucide-react";
+
+import { ProfilePhotoUpload } from "@/components/molecules/ProfilePhotoUpload";
+import { ChangePasswordModal } from "@/components/molecules/ConfirmPasswordModal";
+
+import { getMyProfile, updateMyProfile, updateMyAvatar } from "@/api/users";
+import { Skeleton } from "../ui/skeleton";
 
 export function AccountForm() {
+  const { getToken } = useAuth();
+  const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
+  const queryClient = useQueryClient();
+
   const {
     register,
     handleSubmit,
-    control,
+    reset,
     watch,
-    setValue,
     formState: { errors },
-  } = useForm({
-    defaultValues: {
-      name: "John Doe",
-      phone: "+91 9876543210",
-      email: "john@example.com",
-      bio: "This is my bio",
+  } = useForm();
+
+  const [editField, setEditField] = useState(null);
+  const [originalValues, setOriginalValues] = useState(null);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+
+  /* ------------------ LOAD PROFILE ------------------ */
+  const { data: user, isLoading: isProfileLoading } = useQuery({
+    queryKey: ["myProfile"],
+    queryFn: async () => {
+      const token = await getToken();
+      return getMyProfile({ token });
+    },
+    select: (res) => res.user,
+  });
+
+  useEffect(() => {
+    if (!user) return;
+
+    const initial = {
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      email: user.email || "",
       currentPassword: "",
       newPassword: "",
       confirmNewPassword: "",
+    };
+
+    reset(initial);
+    setOriginalValues(initial);
+  }, [user]);
+
+  const firstName = watch("firstName");
+  const lastName = watch("lastName");
+
+  const hasChanges =
+    originalValues &&
+    (firstName !== originalValues.firstName ||
+      lastName !== originalValues.lastName);
+
+  /* ------------------ SAVE PROFILE ------------------ */
+  const { mutate: saveProfile, isPending: isSavingProfile } = useMutation({
+    mutationFn: async (formData) => {
+      const token = await getToken();
+      return updateMyProfile({
+        token,
+        payload: {
+          name: {
+            first: formData.firstName.trim(),
+            last: formData.lastName.trim(),
+          },
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Profile updated.");
+
+      queryClient.invalidateQueries(["myProfile"]);
+      setEditField(null);
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || "Failed to update profile");
     },
   });
 
-  const [editField, setEditField] = useState(null);
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
-
-  const name = useWatch({ control, name: "name" });
-  const phone = useWatch({ control, name: "phone" });
-  const email = useWatch({ control, name: "email" });
-  const bio = useWatch({ control, name: "bio" });
-  const newPassword = watch("newPassword");
-
-  const onSubmit = (data) => {
-    console.log("Submitted:", data);
-    setEditField(null);
+  const handleProfileSubmit = (data) => {
+    if (!hasChanges) {
+      setEditField(null);
+      return;
+    }
+    saveProfile(data);
   };
 
-  const handleDeactivate = () => {
-    console.log("Account deactivated");
-    // Add your deactivate logic here
+  /* ------------------ AVATAR ------------------ */
+  const { mutate: changeAvatar, isPending: isAvatarUpdating } = useMutation({
+    mutationFn: async (file) => {
+      const token = await getToken();
+      return updateMyAvatar({ token, file });
+    },
+    onSuccess: () => {
+      toast.success("Avatar updated.");
+      queryClient.invalidateQueries(["myProfile"]);
+    },
+    onError: () => {
+      toast.error("Failed to update avatar");
+    },
+  });
+
+  /* ------------------ PASSWORD (CLERK FRONTEND) ------------------ */
+  const { mutate: changePassword, isPending: isPasswordUpdating } = useMutation(
+    {
+      mutationFn: async ({ currentPassword, newPassword }) => {
+        if (!isClerkLoaded || !clerkUser) throw new Error("Clerk not ready");
+
+        return clerkUser.updatePassword({
+          currentPassword,
+          newPassword,
+        });
+      },
+      onSuccess: () => {
+        toast.success("Password updated.");
+        setIsPasswordModalOpen(false);
+        reset((old) => ({
+          ...old,
+          currentPassword: "",
+          newPassword: "",
+          confirmNewPassword: "",
+        }));
+      },
+      onError: (err) => {
+        console.log(err);
+
+        toast.error(err?.errors?.[0]?.message || err?.message || "Failed");
+      },
+    }
+  );
+
+  const handlePasswordSubmit = (data) => {
+    changePassword({
+      currentPassword: data.currentPassword,
+      newPassword: data.newPassword,
+    });
   };
 
-  const handlePasswordChange = (data) => {
-    console.log("Password change data:", data);
-    setIsPasswordModalOpen(false);
-    setValue("currentPassword", "");
-    setValue("newPassword", "");
-    setValue("confirmNewPassword", "");
-    // Add your password update logic here
-  };
+  /* ------------------ UI ------------------ */
 
   return (
-    <div className="w-full h-full flex flex-col relative">
+    <div className="w-full h-full relative">
+      {isProfileLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/70 z-20">
+          <Spinner className="size-10" />
+        </div>
+      )}
+
       <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="flex flex-col gap-6 p-6 flex-grow"
+        onSubmit={handleSubmit(handleProfileSubmit)}
+        className="p-6 flex flex-col gap-6"
       >
-        {/* Profile Photo */}
+        {/* Avatar */}
         <div className="self-center">
-          <ProfilePhotoUpload
-            src="/default-avatar.png"
-            onEdit={() => console.log("Edit photo")}
-          />
+          {isAvatarUpdating ? (
+            <Skeleton className="relative w-20 h-20 rounded-full bg-gray-900" />
+          ) : (
+            <ProfilePhotoUpload
+              src={user?.profileImageUrl}
+              alt="Avatar"
+              onEdit={(file) => changeAvatar(file)}
+              isUploading={false}
+              name={user?.firstName}
+            />
+          )}
         </div>
 
         {/* Name */}
-        <div className="flex justify-between gap-1">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-muted-foreground">
-              Name
-            </label>
-            {editField === "name" ? (
-              <Input
-                {...register("name", { required: "Name is required" })}
-                placeholder="Enter your name"
-              />
-            ) : (
-              <p className="text-foreground font-medium">{name || "Not set"}</p>
-            )}
-            {errors.name && (
-              <span className="text-xs text-red-500">
-                {errors.name.message}
-              </span>
-            )}
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="self-end"
-            onClick={() => setEditField(editField === "name" ? null : "name")}
-          >
-            {editField === "name" ? (
-              <X className="w-4 h-4" />
-            ) : (
-              <Pencil className="w-4 h-4" />
-            )}
-          </Button>
-        </div>
+        <div className="flex justify-between">
+          <div className="flex flex-col gap-1 w-full">
+            <label className="text-sm text-muted-foreground">Name</label>
 
-        {/* Phone */}
-        <div className="flex justify-between gap-1">
-          <div className="flex flex-col gap-1 flex-1">
-            <label className="text-sm font-medium text-muted-foreground">
-              Phone Number
-            </label>
-            {editField === "phone" ? (
-              <Input
-                {...register("phone", { required: "Phone number is required" })}
-                type="tel"
-                placeholder="Enter your number"
-              />
+            {editField === "name" ? (
+              <div className="flex gap-2">
+                <Input
+                  {...register("firstName", {
+                    required: "First name required",
+                  })}
+                  placeholder="First name"
+                  disabled={isSavingProfile}
+                />
+                <Input
+                  {...register("lastName", { required: "Last name required" })}
+                  placeholder="Last name"
+                  disabled={isSavingProfile}
+                />
+              </div>
             ) : (
-              <p className="text-foreground font-medium">
-                {phone || "Not set"}
+              <p className="font-medium">
+                {user?.firstName} {user?.lastName}
               </p>
             )}
-            {errors.phone && (
-              <span className="text-xs text-red-500">
-                {errors.phone.message}
-              </span>
-            )}
           </div>
+
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="self-end"
-            onClick={() => setEditField(editField === "phone" ? null : "phone")}
+            onClick={() =>
+              editField === "name" ? setEditField(null) : setEditField("name")
+            }
+            disabled={isSavingProfile}
           >
-            {editField === "phone" ? (
-              <X className="w-4 h-4" />
-            ) : (
-              <Pencil className="w-4 h-4" />
-            )}
+            {editField === "name" ? <X /> : <Pencil />}
           </Button>
         </div>
 
         {/* Email */}
-        <div className="flex justify-between gap-1">
-          <div className="flex flex-col gap-1 flex-1">
-            <label className="text-sm font-medium text-muted-foreground">
-              Email
-            </label>
-            {editField === "email" ? (
-              <Input
-                {...register("email", {
-                  required: "Email is required",
-                  pattern: {
-                    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                    message: "Invalid email format",
-                  },
-                })}
-                type="email"
-                placeholder="Enter your email"
-              />
-            ) : (
-              <p className="text-foreground font-medium">
-                {email || "Not set"}
-              </p>
-            )}
-            {errors.email && (
-              <span className="text-xs text-red-500">
-                {errors.email.message}
-              </span>
-            )}
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="self-end"
-            onClick={() => setEditField(editField === "email" ? null : "email")}
-          >
-            {editField === "email" ? (
-              <X className="w-4 h-4" />
-            ) : (
-              <Pencil className="w-4 h-4" />
-            )}
-          </Button>
-        </div>
-
-        {/* Bio */}
-        <div className="flex justify-between gap-1">
-          <div className="flex flex-col gap-1 flex-1">
-            <label className="text-sm font-medium text-muted-foreground">
-              Bio
-            </label>
-            {editField === "bio" ? (
-              <textarea
-                {...register("bio")}
-                className="bg-background text-foreground border border-border rounded-md px-3 py-2 text-sm focus-visible:border-2 focus-visible:border-border focus-visible:ring-0 focus-visible:outline-none shadow-none h-24 resize-none"
-              />
-            ) : (
-              <p className="text-foreground">{bio || "No bio set"}</p>
-            )}
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="self-start mt-6"
-            onClick={() => setEditField(editField === "bio" ? null : "bio")}
-          >
-            {editField === "bio" ? (
-              <X className="w-4 h-4" />
-            ) : (
-              <Pencil className="w-4 h-4" />
-            )}
-          </Button>
+        <div>
+          <label className="text-sm text-muted-foreground">Email</label>
+          <p className="font-medium">{user?.email}</p>
         </div>
 
         {/* Password */}
-        <div className="flex justify-between gap-1 items-center">
-          <div className="flex flex-col gap-1 flex-1">
-            <label className="text-sm font-medium text-muted-foreground">
-              Password
-            </label>
-            <p className="text-foreground font-medium">********</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <label className="text-sm text-muted-foreground">Password</label>
+            <p className="font-medium">********</p>
           </div>
+
           <Button
             type="button"
             variant="ghost"
-            className="self-end "
             onClick={() => setIsPasswordModalOpen(true)}
           >
             Change
           </Button>
         </div>
 
-        {/* Actions */}
         {editField && (
-          <div className="flex flex-col gap-4 mt-10">
-            <Button type="submit" className="w-full">
-              Save Changes
-            </Button>
-          </div>
+          <Button
+            type="submit"
+            className="mt-8 w-full"
+            disabled={!hasChanges || isSavingProfile}
+          >
+            {isSavingProfile ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              "Save Changes"
+            )}
+          </Button>
         )}
       </form>
 
-      {/* Deactivate Account */}
-      <div className="p-6 border-t border-border">
-        <Button
-          type="button"
-          variant="destructive"
-          className="w-full"
-          onClick={handleDeactivate}
-        >
-          Deactivate Account
-        </Button>
-      </div>
-
       {/* Password Modal */}
       {isPasswordModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-background p-6 rounded-lg shadow-lg w-full max-w-md">
-            <h3 className="text-lg font-medium mb-4">Change Password</h3>
-            <form
-              onSubmit={handleSubmit(handlePasswordChange)}
-              className="flex flex-col gap-4"
-            >
-              <Input
-                {...register("currentPassword", {
-                  required: "Current password is required",
-                })}
-                type="password"
-                placeholder="Current Password"
-              />
-              {errors.currentPassword && (
-                <span className="text-xs text-red-500">
-                  {errors.currentPassword.message}
-                </span>
-              )}
-
-              <Input
-                {...register("newPassword", {
-                  required: "New password is required",
-                })}
-                type="password"
-                placeholder="New Password"
-              />
-              {errors.newPassword && (
-                <span className="text-xs text-red-500">
-                  {errors.newPassword.message}
-                </span>
-              )}
-
-              <Input
-                {...register("confirmNewPassword", {
-                  required: "Please confirm your new password",
-                  validate: (value) =>
-                    value === newPassword || "Passwords do not match",
-                })}
-                type="password"
-                placeholder="Confirm New Password"
-              />
-              {errors.confirmNewPassword && (
-                <span className="text-xs text-red-500">
-                  {errors.confirmNewPassword.message}
-                </span>
-              )}
-
-              <div className="flex gap-4 mt-4">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="flex-1"
-                  onClick={() => setIsPasswordModalOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" className="flex-1">
-                  Update Password
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ChangePasswordModal
+          register={register}
+          errors={errors}
+          newPassword={watch("newPassword")}
+          onSubmit={handleSubmit(handlePasswordSubmit)}
+          onClose={() => setIsPasswordModalOpen(false)}
+          isUpdating={isPasswordUpdating}
+        />
       )}
     </div>
   );

@@ -2,7 +2,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/atoms/Avatar";
 import { CallControls } from "@/components/molecules/CallControls";
 
 export const NormalCallCard = ({ name, img, onEnd }) => (
-  <div className="flex flex-col bg-primary items-center justify-center gap-16 h-full">
+  <div className="flex flex-col bg-primary items-center justify-center gap-16 h-full w-full">
     <div className="flex flex-col items-center">
       <Avatar className="w-20 h-20 mb-4">
         <AvatarImage src={img} />
