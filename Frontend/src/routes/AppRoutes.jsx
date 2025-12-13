@@ -32,7 +32,10 @@ const router = createBrowserRouter([
       {
         path: "chat",
         element: <ChatWindow />,
-        children: [{ path: ":chatId", element: <ChatDetail /> }],
+        children: [
+          { path: ":chatId", element: <ChatDetail /> },
+          { path: "new/:friendId", element: <ChatDetail /> },
+        ],
       },
       { path: "friend", element: <FriendsPanel /> },
       {
