@@ -16,6 +16,22 @@ export function ChangePasswordModal({
         <h3 className="text-lg font-medium mb-4">Change Password</h3>
 
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          {/* Current password */}
+          <Input
+            {...register("currentPassword", {
+              required: "Current password is required",
+            })}
+            type="password"
+            placeholder="Current Password"
+            disabled={isUpdating}
+          />
+          {errors.currentPassword && (
+            <span className="text-xs text-red-500">
+              {errors.currentPassword.message}
+            </span>
+          )}
+
+          {/* New password */}
           <Input
             {...register("newPassword", {
               required: "New password is required",
@@ -30,6 +46,7 @@ export function ChangePasswordModal({
             </span>
           )}
 
+          {/* Confirm new password */}
           <Input
             {...register("confirmNewPassword", {
               required: "Please confirm your new password",

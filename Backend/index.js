@@ -1,6 +1,9 @@
-const dotenv = require("dotenv");
-const mongoose = require("mongoose");
-const logger = require("./utils/logger");
+import dotenv from "dotenv";
+import mongoose from "mongoose";
+import http from "http";
+import logger from "./utils/logger.js";
+import socketServer from "./socket/socket.js";
+import app from "./app.js";
 
 // Handle uncaught exceptions
 process.on("uncaughtException", (err) => {
@@ -9,11 +12,8 @@ process.on("uncaughtException", (err) => {
 });
 
 // Load env
-const env = process.env.NODE_ENV || "development";
-
 dotenv.config();
-
-const app = require("./app");
+const env = process.env.NODE_ENV || "development";
 
 // Config
 const PORT = process.env.PORT || 5000;
@@ -22,20 +22,29 @@ const DB_URI = process.env.DB_URI;
 
 let server;
 
+// Create HTTP server (IMPORTANT for Socket.IO)
+const httpServer = http.createServer(app);
+
+// Initialize socket server
+socketServer(httpServer);
+
 // Connect to MongoDB
 const connectDB = async (retries = 5) => {
   while (retries) {
     try {
-      await mongoose.connect(DB_URI, { dbName: process.env.DB_NAME });
+      await mongoose.connect(DB_URI, {
+        dbName: process.env.DB_NAME,
+      });
+
       logger.info("✅ MongoDB connected successfully");
       startServer();
       return;
     } catch (err) {
       logger.warn(
-        `🔁 Retry MongoDB connection (${5 - retries + 1}/5): ${err.message}`
+        `🔁 Retry MongoDB connection (${6 - retries}/5): ${err.message}`
       );
       retries--;
-      await new Promise((res) => setTimeout(res, 5000)); // wait 5 sec before retry
+      await new Promise((res) => setTimeout(res, 5000));
     }
   }
 
@@ -44,11 +53,10 @@ const connectDB = async (retries = 5) => {
 };
 
 const startServer = () => {
-  server = app.listen(PORT, () => {
+  server = httpServer.listen(PORT, () => {
     logger.info(`🚀 Server running at ${SERVER_URL} [${env}]`);
 
-    // one-time console confirmation in prod for terminal visibility
-    if (process.env.NODE_ENV === "production") {
+    if (env === "production") {
       console.log(`✔️  Server started on port ${PORT} [production]`);
     }
   });
