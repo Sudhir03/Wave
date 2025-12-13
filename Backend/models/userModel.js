@@ -54,9 +54,7 @@ const userSchema = new mongoose.Schema({
   clerkCreatedAt: Date,
   clerkUpdatedAt: Date,
 
-  friends: [
-    { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // Friends reference array
-  ],
+  friendships: [{ type: mongoose.Schema.Types.ObjectId, ref: "Friendship" }],
 });
 
 module.exports = mongoose.model("User", userSchema);

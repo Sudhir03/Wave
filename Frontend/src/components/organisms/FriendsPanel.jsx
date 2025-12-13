@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-react";
+import { useNavigate } from "react-router-dom";
 
 import { Input } from "@/components/atoms/Input";
 import { Button } from "@/components/atoms/Button";
@@ -17,11 +18,12 @@ import { toast } from "react-toastify";
 import { Spinner } from "@/components/atoms/Spinner";
 import { MoreVertical } from "lucide-react";
 
-import { getMyFriends, removeFriend } from "@/api/friends";
 import {
+  getMyFriends,
+  removeFriend,
   getPendingRequests,
   respondToFriendRequest,
-} from "@/api/friendRequests";
+} from "@/api/friends";
 
 export default function FriendsPanel() {
   const [search, setSearch] = useState("");
@@ -29,6 +31,7 @@ export default function FriendsPanel() {
 
   const queryClient = useQueryClient();
   const { getToken } = useAuth();
+  const navigate = useNavigate();
 
   // Friend requests list (incoming)
   const { data: friendRequests = [] } = useQuery({
@@ -115,6 +118,15 @@ export default function FriendsPanel() {
     respondRequestMutate({ id, action });
   }
 
+  // FriendsPanel.jsx
+
+  const handleOpenChat = (friend) => {
+    if (friend.conversationId) {
+      navigate(`/chat/${friend.conversationId}`);
+    } else {
+      navigate(`/chat/new/${friend._id}`);
+    }
+  };
   const filteredFriends = friends.filter((friend) => {
     const q = search.toLowerCase();
     return (
@@ -203,7 +215,10 @@ export default function FriendsPanel() {
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      onClick={() => handleRequestAction(req.id, "accept")}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRequestAction(req.id, "accept");
+                      }}
                       disabled={isResponding}
                     >
                       Accept
@@ -212,7 +227,10 @@ export default function FriendsPanel() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleRequestAction(req.id, "decline")}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRequestAction(req.id, "decline");
+                      }}
                       disabled={isResponding}
                     >
                       Decline
@@ -238,7 +256,11 @@ export default function FriendsPanel() {
                 filteredFriends.map((friend) => (
                   <div
                     key={friend._id}
-                    className="flex items-center justify-between gap-3 py-2 border-b border-border relative"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenChat(friend);
+                    }}
+                    className="flex items-center justify-between cursor-pointer"
                   >
                     <div className="flex items-center gap-3">
                       <Avatar className="w-12 h-12">
@@ -267,6 +289,7 @@ export default function FriendsPanel() {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
+                            onClick={(e) => e.stopPropagation()}
                             variant="ghost"
                             className="h-8 w-8 flex items-center justify-center rounded-full 
                    hover:bg-gray-200 dark:hover:bg-gray-700 
@@ -278,7 +301,10 @@ export default function FriendsPanel() {
 
                         <DropdownMenuContent align="end" className="w-36">
                           <DropdownMenuItem
-                            onClick={() => handleUnfollow(friend._id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUnfollow(friend._id);
+                            }}
                             disabled={isPending}
                             className="flex items-center gap-2 cursor-pointer"
                           >

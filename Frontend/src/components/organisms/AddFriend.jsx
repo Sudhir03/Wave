@@ -16,9 +16,9 @@ import {
   sendFriendRequest,
   getSentFriendRequests,
   cancelFriendRequest,
-  getPendingRequests, // incoming (you are receiver)
-  respondToFriendRequest, // accepts/declines
-} from "@/api/friendRequests";
+  getPendingRequests,
+  respondToFriendRequest,
+} from "@/api/friends";
 
 export default function AddFriendModal({ isModalOpen, setModalOpen }) {
   const [search, setSearch] = useState("");

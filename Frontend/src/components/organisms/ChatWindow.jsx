@@ -44,7 +44,7 @@ function formatTimestamp(date) {
 
 /* ------------------ Component ------------------ */
 export default function ChatWindow() {
-  const { chatId } = useParams();
+  const { chatId, friendId } = useParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [showPinned, setShowPinned] = useState(true);
@@ -342,7 +342,7 @@ export default function ChatWindow() {
                     <div className="flex items-center justify-between">
                       {/* <span className="font-medium">{chat.name}</span> */}
                       <span
-                        className="font-medium truncate block max-w-[80px]"
+                        className="font-medium truncate block max-w-20"
                         title={chat.name}
                       >
                         {chat.name.split(" ").slice(0, 2).join(" ")}
@@ -461,7 +461,7 @@ export default function ChatWindow() {
 
       {/* Right Panel */}
       <div className="flex-1">
-        {chatId ? (
+        {chatId || friendId ? (
           <Outlet
             context={{
               pinnedUsers,

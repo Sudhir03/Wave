@@ -193,7 +193,7 @@ const formatTime = (date) =>
   date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
 export default function ChatDetail() {
-  const { chatId } = useParams();
+  const { chatId, friendId } = useParams();
 
   const {
     pinnedUsers,
@@ -267,7 +267,7 @@ export default function ChatDetail() {
         <div className="flex items-center gap-2">
           <Avatar className="w-12 h-12">
             <AvatarImage src={chat.picture} alt={chat.name} />
-            <AvatarFallback className="bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white font-medium">
+            <AvatarFallback className="bg-linear-to-r from-fuchsia-500 to-purple-600 text-white font-medium">
               {chat.name.charAt(0)}
             </AvatarFallback>
           </Avatar>
