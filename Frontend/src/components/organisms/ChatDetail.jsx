@@ -47,6 +47,7 @@ import { getMessages, sendMessage } from "@/api/chat";
    Socket
 ========================= */
 import socket from "@/socket";
+import { MessageStatus } from "../molecules/MessageStatus";
 
 /* =========================
    Helpers
@@ -129,21 +130,33 @@ export default function ChatDetail() {
 
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
 
-    staleTime: 30 * 1000,
-    cacheTime: 5 * 60 * 1000,
+    // 🚫 Disable refetching
+    staleTime: Infinity,
+
+    // 🚫 Disable cache
+    cacheTime: 0,
+
+    // 🚫 No refetch triggers
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   });
 
   /* =========================
      Flatten Messages
   ========================= */
   const messages =
-    data?.pages.flatMap((page) =>
-      page.messages.map((m) => ({
-        ...m,
-        id: m._id,
-      }))
-    ) || [];
+    data?.pages
+      .flatMap((page) =>
+        page.messages.map((m) => ({
+          ...m,
+          id: m._id,
+        }))
+      )
+      .sort(
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      ) || [];
 
   /* =========================
      Socket: Typing Indicator
@@ -186,9 +199,7 @@ export default function ChatDetail() {
   useEffect(() => {
     if (!chatId) return;
 
-    socket.emit("join_chat", chatId);
-
-    socket.on("receive_message", (data) => {
+    const handleReceiveMessage = (data) => {
       if (data.sender?._id === userId) return;
 
       queryClient.setQueryData(["messages", chatId], (old) => {
@@ -208,13 +219,49 @@ export default function ChatDetail() {
           ),
         };
       });
-    });
+    };
+
+    const handleMessageRead = ({ conversationId, messageId }) => {
+      queryClient.setQueryData(["messages", conversationId], (old) => {
+        if (!old) return old;
+
+        return {
+          ...old,
+          pages: old.pages.map((page) => ({
+            ...page,
+            messages: page.messages.map((m) =>
+              m._id === messageId ? { ...m, status: "read" } : m
+            ),
+          })),
+        };
+      });
+    };
+
+    socket.emit("join_chat", chatId);
+    socket.on("receive_message", handleReceiveMessage);
+    socket.on("message_read", handleMessageRead);
 
     return () => {
       socket.emit("leave_chat", chatId);
-      socket.off("receive_message");
+      socket.off("receive_message", handleReceiveMessage);
+      socket.off("message_read", handleMessageRead);
     };
-  }, [chatId, queryClient, userId]);
+  }, [chatId, userId, queryClient]);
+
+  useEffect(() => {
+    if (!chatId || !messages.length) return;
+
+    const lastUnreadMessage = [...messages]
+      .reverse()
+      .find((m) => m.sender._id !== userId && m.status !== "read");
+
+    if (lastUnreadMessage) {
+      socket.emit("message_read", {
+        conversationId: chatId,
+        messageId: lastUnreadMessage._id,
+      });
+    }
+  }, [chatId, messages, userId]);
 
   /* =========================
      Handlers
@@ -247,7 +294,6 @@ export default function ChatDetail() {
   const sendMessageMutation = useMutation({
     mutationFn: async ({ content, media }) => {
       const token = await getToken();
-
       return sendMessage({
         token,
         conversationId: chatId,
@@ -256,13 +302,20 @@ export default function ChatDetail() {
       });
     },
 
-    onSuccess: (data) => {
-      const savedMessage = {
-        ...data.sentMessage,
-        sender: {
-          _id: userId,
-          profileImageUrl: profile?.user?.profileImageUrl,
-        },
+    onMutate: async ({ content, media }) => {
+      await queryClient.cancelQueries(["messages", chatId]);
+
+      const previousData = queryClient.getQueryData(["messages", chatId]);
+
+      const optimisticId = `temp-${Date.now()}`;
+
+      const optimisticMessage = {
+        _id: optimisticId,
+        content,
+        media,
+        timestamp: new Date().toISOString(),
+        sender: { _id: userId },
+        status: "sending",
       };
 
       queryClient.setQueryData(["messages", chatId], (old) => {
@@ -272,12 +325,48 @@ export default function ChatDetail() {
           ...old,
           pages: old.pages.map((page, idx) =>
             idx === old.pages.length - 1
-              ? {
-                  ...page,
-                  messages: [...page.messages, savedMessage],
-                }
+              ? { ...page, messages: [...page.messages, optimisticMessage] }
               : page
           ),
+        };
+      });
+
+      return { previousData, optimisticId };
+    },
+
+    onSuccess: (data, _, context) => {
+      queryClient.setQueryData(["messages", chatId], (old) => {
+        if (!old) return old;
+
+        return {
+          ...old,
+          pages: old.pages.map((page) => ({
+            ...page,
+            messages: page.messages.map((m) =>
+              m._id === context.optimisticId
+                ? {
+                    ...data.sentMessage,
+                    status: "sent",
+                  }
+                : m
+            ),
+          })),
+        };
+      });
+    },
+
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(["messages", chatId], (old) => {
+        if (!old) return old;
+
+        return {
+          ...old,
+          pages: old.pages.map((page) => ({
+            ...page,
+            messages: page.messages.map((m) =>
+              m._id === context.optimisticId ? { ...m, status: "failed" } : m
+            ),
+          })),
         };
       });
     },
@@ -504,15 +593,20 @@ export default function ChatDetail() {
               )}
 
               {/* Timestamp */}
-              {isLastInMinute && (
-                <div
-                  className={`text-xs text-muted-foreground mt-1 ${
-                    msg.sender._id === userId ? "text-right" : "text-left"
-                  }`}
-                >
+
+              <div
+                className={`flex items-center gap-1 mt-1 ${
+                  msg.sender._id === userId ? "justify-end" : "justify-start"
+                }`}
+              >
+                <span className="text-xs text-muted-foreground">
                   {formatTime(msg.timestamp)}
-                </div>
-              )}
+                </span>
+
+                {msg.sender._id === userId && (
+                  <MessageStatus status={msg.status} />
+                )}
+              </div>
             </div>
           );
         })}
