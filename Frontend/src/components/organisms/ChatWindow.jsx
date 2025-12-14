@@ -125,6 +125,8 @@ export default function ChatWindow() {
 
   const closeChat = () => navigate(-1);
 
+  console.log(visibleChats);
+
   /* ------------------ UI ------------------ */
   return (
     <div className="flex h-full overflow-hidden">
@@ -184,7 +186,7 @@ export default function ChatWindow() {
                       </span>
                     </div>
                     <span className="text-sm truncate text-muted-foreground">
-                      {chat.lastMessage?.text || "No messages yet"}
+                      {chat.lastMessage?.content || "No messages yet"}
                     </span>
                   </div>
 

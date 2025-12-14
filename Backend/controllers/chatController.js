@@ -27,7 +27,7 @@ exports.getMyConversations = async (req, res) => {
       )
       .populate({
         path: "lastMessage",
-        select: "text senderId timestamp",
+        select: "content senderId timestamp",
       });
 
     const formatted = conversations.map((conv) => {
@@ -201,9 +201,9 @@ exports.getUnifiedChatData = catchAsync(async (req, res) => {
 // Send Message
 exports.sendMessage = catchAsync(async (req, res) => {
   const { userId } = req;
+
   const {
     conversationId, // Optional: Existing conversation ID
-    friendId, // Optional: Friend's User ID (Used only for New Chat)
     content,
     media = [],
   } = req.body;
@@ -217,9 +217,10 @@ exports.sendMessage = catchAsync(async (req, res) => {
 
   let finalConversationId = conversationId;
 
+  // =====================================================
+  // SCENARIO A: NEW CHAT MODE (Conversation ID missing)
+  // =====================================================
   if (!finalConversationId) {
-    // 🚩 SCENARIO A: NEW CHAT MODE (Conversation ID is missing)
-
     if (!friendId) {
       return res.status(400).json({
         isSuccess: false,
@@ -227,7 +228,7 @@ exports.sendMessage = catchAsync(async (req, res) => {
       });
     }
 
-    // 1. Find and Verify Friendship
+    // 1️⃣ Find Friendship
     const friendship = await Friendship.findOne({
       status: "accepted",
       $or: [
@@ -243,60 +244,72 @@ exports.sendMessage = catchAsync(async (req, res) => {
       });
     }
 
-    // 1.1. Check if conversation already exists in friendship
+    // 2️⃣ Conversation already exists
     if (friendship.conversationId) {
-      // Agar conversation ID friendship mein maujood hai lekin client ne nahi bheji,
-      // toh hum isko use kar lenge aur redirect ki zaroorat nahi padegi.
       finalConversationId = friendship.conversationId;
-      console.log(
-        "INFO: Conversation found in Friendship model. Proceeding with existing ID."
-      );
     } else {
-      // 2. Create Conversation
+      // 3️⃣ Create new conversation
       const newConversation = new Conversation({
         participants: [userId, friendId],
       });
+
       const savedConversation = await newConversation.save();
       finalConversationId = savedConversation._id;
 
-      // 3. Update Friendship Link
+      // 4️⃣ Attach conversation to friendship
       friendship.conversationId = finalConversationId;
       await friendship.save();
     }
-  } else {
-    // 🚩 SCENARIO B: EXISTING CHAT MODE (Conversation ID is available)
+  }
 
-    // 1. Verify Conversation existence and participation
+  // =====================================================
+  // SCENARIO B: EXISTING CHAT MODE
+  // =====================================================
+  else {
     const conversation = await Conversation.findById(finalConversationId);
 
     if (!conversation) {
-      return res
-        .status(404)
-        .json({ isSuccess: false, message: "Conversation not found." });
+      return res.status(404).json({
+        isSuccess: false,
+        message: "Conversation not found.",
+      });
     }
 
     if (!conversation.participants.some((p) => p.toString() === userId)) {
-      return res
-        .status(403)
-        .json({ isSuccess: false, message: "Unauthorized to send messages." });
+      return res.status(403).json({
+        isSuccess: false,
+        message: "Unauthorized to send messages.",
+      });
     }
   }
 
-  // 4. Create and Save Message (Runs in BOTH scenarios)
+  // =====================================================
+  // CREATE & SAVE MESSAGE
+  // =====================================================
   const newMessage = new Message({
     conversationId: finalConversationId,
     sender: userId,
-    content: content,
-    media: media,
+    content,
+    media,
   });
+
   const savedMessage = await newMessage.save();
 
-  // 5. Success Response
-  // Hamesha finalConversationId return karo, kyonki agar naya chat bana hai
-  // toh frontend ko is ID se redirect karna hoga.
+  // =====================================================
+  // UPDATE CONVERSATION LAST MESSAGE
+  // =====================================================
+  await Conversation.findByIdAndUpdate(finalConversationId, {
+    lastMessage: savedMessage._id,
+    updatedAt: new Date(),
+  });
+
+  // =====================================================
+  // RESPONSE
+  // =====================================================
   return res.status(201).json({
+    isSuccess: true,
     message: "Message sent successfully.",
-    conversationId: finalConversationId, // New ID (if created) or Existing ID
+    conversationId: finalConversationId,
     sentMessage: savedMessage,
   });
 });
