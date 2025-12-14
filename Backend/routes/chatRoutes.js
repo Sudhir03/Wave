@@ -6,6 +6,13 @@ const chatController = require("../controllers/chatController");
 
 const router = express.Router();
 
+router.get("/my-conversations", requireAuth, chatController.getMyConversations);
+router.get(
+  "/:conversationId/messages",
+  requireAuth,
+  chatController.getMessages
+);
+
 // GET: Unified Fetch by Friend ID (New Chat)
 router.get(
   "/by-user/:friendId",

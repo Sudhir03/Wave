@@ -1,41 +1,63 @@
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
+const http = require("http");
 const logger = require("./utils/logger");
-
-// Handle uncaught exceptions
-process.on("uncaughtException", (err) => {
-  logger.error(`💥 UNCAUGHT EXCEPTION: ${err.name} | ${err.message}`);
-  process.exit(1);
-});
-
-// Load env
-const env = process.env.NODE_ENV || "development";
-
+const socketServer = require("./socket/socket");
 dotenv.config();
-
 const app = require("./app");
 
+// =======================
+// Load Environment
+// =======================
+const env = process.env.NODE_ENV || "development";
+
+// =======================
 // Config
+// =======================
 const PORT = process.env.PORT || 5000;
 const SERVER_URL = process.env.SERVER_URL || `http://localhost:${PORT}`;
 const DB_URI = process.env.DB_URI;
 
 let server;
 
-// Connect to MongoDB
+// =======================
+// Handle uncaught exceptions
+// =======================
+process.on("uncaughtException", (err) => {
+  logger.error(`💥 UNCAUGHT EXCEPTION: ${err.name} | ${err.message}`);
+  process.exit(1);
+});
+
+// =======================
+// Create HTTP Server
+// (Required for Socket.IO)
+// =======================
+const httpServer = http.createServer(app);
+
+// =======================
+// Initialize Socket.IO
+// =======================
+socketServer(httpServer);
+
+// =======================
+// Connect MongoDB
+// =======================
 const connectDB = async (retries = 5) => {
   while (retries) {
     try {
-      await mongoose.connect(DB_URI, { dbName: process.env.DB_NAME });
+      await mongoose.connect(DB_URI, {
+        dbName: process.env.DB_NAME,
+      });
+
       logger.info("✅ MongoDB connected successfully");
       startServer();
       return;
     } catch (err) {
       logger.warn(
-        `🔁 Retry MongoDB connection (${5 - retries + 1}/5): ${err.message}`
+        `🔁 Retry MongoDB connection (${6 - retries}/5): ${err.message}`
       );
       retries--;
-      await new Promise((res) => setTimeout(res, 5000)); // wait 5 sec before retry
+      await new Promise((res) => setTimeout(res, 5000));
     }
   }
 
@@ -43,18 +65,22 @@ const connectDB = async (retries = 5) => {
   process.exit(1);
 };
 
+// =======================
+// Start Server
+// =======================
 const startServer = () => {
-  server = app.listen(PORT, () => {
+  server = httpServer.listen(PORT, () => {
     logger.info(`🚀 Server running at ${SERVER_URL} [${env}]`);
 
-    // one-time console confirmation in prod for terminal visibility
-    if (process.env.NODE_ENV === "production") {
-      console.log(`✔️  Server started on port ${PORT} [production]`);
+    if (env === "production") {
+      console.log(`✔️ Server started on port ${PORT} [production]`);
     }
   });
 };
 
-// Graceful shutdowns
+// =======================
+// Graceful Shutdowns
+// =======================
 process.on("unhandledRejection", (err) => {
   logger.error(`💥 UNHANDLED REJECTION: ${err.name} | ${err.message}`);
   shutdown(1);
@@ -81,5 +107,7 @@ const shutdown = async (exitCode) => {
   }
 };
 
-// Init everything
+// =======================
+// Init
+// =======================
 connectDB();

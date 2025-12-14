@@ -15,7 +15,6 @@ const globalErrorHandler = require("./controllers/errorController");
 // =======================
 // Routes
 // =======================
-
 const userRoutes = require("./routes/userRoutes");
 const friendRoutes = require("./routes/friendRoutes");
 const chatRoutes = require("./routes/chatRoutes");
@@ -23,46 +22,56 @@ const chatRoutes = require("./routes/chatRoutes");
 const app = express();
 
 // =======================
-// Global Middleware
+// Trust Proxy
 // =======================
-
-// Trust reverse proxy (e.g., for secure cookies behind Nginx, Heroku)
 app.set("trust proxy", 1);
 
-// Rate limiter (apply to all /api/* routes)
+// =======================
+// Rate Limiter
+// =======================
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // limit each IP to 100 requests
-  message: "Oops! Too many requests. Let’s slow down and try again shortly",
+  max: 200,
+  message: "Too many requests, please try again later",
 });
 app.use("/api", limiter);
 
-// Enable CORS for frontend origin
+// =======================
+// CORS CONFIG (FIXED)
+// =======================
 const allowedOrigins = [process.env.FRONTEND_URL];
-
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+    origin: (origin, callback) => {
+      // Allow Postman, server-to-server, curl
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
       }
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-// Parse incoming JSON payloads
-app.use(express.json());
+// =======================
+// Body Parser
+// =======================
+app.use(express.json({ limit: "10kb" }));
 
-// Log HTTP requests (only in development)
+// =======================
+// Logger
+// =======================
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
 // =======================
-// Health Check Route
+// Health Check
 // =======================
 app.get("/api/v1/health", (req, res) => {
   res.status(200).json({
@@ -72,18 +81,17 @@ app.get("/api/v1/health", (req, res) => {
 });
 
 // =======================
-// Application Routes
+// API Routes
 // =======================
-
 app.use("/api/users", userRoutes);
 app.use("/api/friends", friendRoutes);
 app.use("/api/chats", chatRoutes);
 
 // =======================
-// Handle Unmatched Routes
+// 404 Handler
 // =======================
 app.use((req, res, next) => {
-  return next(new AppError("The requested resource was not found", 404));
+  next(new AppError(`Can't find ${req.originalUrl} on this server`, 404));
 });
 
 // =======================

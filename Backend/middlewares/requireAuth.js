@@ -18,8 +18,8 @@ exports.requireAuth = async (req, res, next) => {
     const authUser = await User.findOne({
       clerkUserId: session.sub,
     });
-
     req.userId = authUser?._id?.toString();
+    req.clerkUserId = authUser?.clerkUserId;
 
     next();
   } catch (error) {
