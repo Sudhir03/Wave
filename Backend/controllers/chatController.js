@@ -4,6 +4,110 @@ const Message = require("../models/messageModel");
 const User = require("../models/userModel");
 const catchAsync = require("../utils/catchAsync");
 
+exports.getMyConversations = async (req, res) => {
+  try {
+    const userId = req.userId; // coming from auth middleware
+    const { limit = 10, cursor } = req.query;
+
+    const query = {
+      participants: userId,
+    };
+
+    // cursor-based pagination
+    if (cursor) {
+      query.updatedAt = { $lt: new Date(cursor) };
+    }
+
+    const conversations = await Conversation.find(query)
+      .sort({ updatedAt: -1 })
+      .limit(Number(limit))
+      .populate(
+        "participants",
+        "fullName username profileImageUrl isOnline lastSeen"
+      )
+      .populate({
+        path: "lastMessage",
+        select: "text senderId timestamp",
+      });
+
+    const formatted = conversations.map((conv) => {
+      const partner = conv.participants.find(
+        (p) => p._id.toString() !== userId
+      );
+
+      return {
+        conversationId: conv._id,
+        type: conv.type,
+        partner,
+        lastMessage: conv.lastMessage,
+        updatedAt: conv.updatedAt,
+      };
+    });
+
+    const nextCursor =
+      conversations.length === Number(limit)
+        ? conversations[conversations.length - 1].updatedAt
+        : null;
+
+    res.status(200).json({
+      conversations: formatted,
+      nextCursor,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to load conversations" });
+  }
+};
+
+exports.getMessages = async (req, res) => {
+  const { conversationId } = req.params;
+  const { cursor, limit = 20 } = req.query;
+  const userId = req.userId;
+
+  // 1️⃣ Validate conversation
+  const conversation = await Conversation.findById(conversationId);
+
+  if (!conversation) {
+    return res.status(404).json({
+      isSuccess: false,
+      message: "Conversation not found",
+    });
+  }
+
+  // 2️⃣ Access control
+  if (!conversation.participants.some((p) => p.toString() === userId)) {
+    return res.status(403).json({
+      isSuccess: false,
+      message: "Access denied",
+    });
+  }
+
+  // 3️⃣ Build query
+  const query = { conversationId };
+
+  if (cursor) {
+    query.timestamp = { $lt: new Date(cursor) };
+  }
+
+  // 4️⃣ Fetch messages (DESC for pagination)
+  const messages = await Message.find(query)
+    .sort({ timestamp: -1 })
+    .limit(Number(limit) + 1)
+    .populate("sender", "fullName profileImageUrl");
+
+  const hasNextPage = messages.length > limit;
+  if (hasNextPage) messages.pop();
+
+  // Reverse → old → new (UI friendly)
+  messages.reverse();
+
+  return res.status(200).json({
+    isSuccess: true,
+    messages,
+    nextCursor: hasNextPage ? messages[0]?.timestamp : null,
+  });
+};
+
 // Unified Chat Data Fetch
 exports.getUnifiedChatData = catchAsync(async (req, res) => {
   const { friendId, conversationId } = req.params;

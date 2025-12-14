@@ -1,5 +1,9 @@
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { useAuth } from "@clerk/clerk-react";
+import { getMyConversations } from "@/api/chat";
+import { useEffect, useRef, useState } from "react";
+
 import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
-import { useState } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/atoms/Avatar";
 import {
   DropdownMenu,
@@ -22,23 +26,22 @@ import {
   Volume,
 } from "lucide-react";
 
-import aliceImg from "@/assets/images/alice.jpg";
 import { getAvatarGradient } from "@/lib/colorGradient";
 import EmptyChatScreen from "./EmptyChatScreen";
+import { Spinner } from "@/components/atoms/Spinner";
 
 /* ------------------ Helper ------------------ */
 function formatTimestamp(date) {
   const now = new Date();
   const diffMs = now - new Date(date);
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
+  const diffMin = Math.floor(diffMs / 60000);
   const diffHrs = Math.floor(diffMin / 60);
   const diffDays = Math.floor(diffHrs / 24);
 
-  if (diffSec < 60) return `${diffSec} sec ago`;
+  if (diffMin < 1) return "Just now";
   if (diffMin < 60) return `${diffMin} min ago`;
   if (diffHrs < 24) return `${diffHrs} hr ago`;
-  if (diffDays === 1) return `Yesterday`;
+  if (diffDays === 1) return "Yesterday";
   return `${diffDays} days ago`;
 }
 
@@ -46,177 +49,88 @@ function formatTimestamp(date) {
 export default function ChatWindow() {
   const { chatId, friendId } = useParams();
   const navigate = useNavigate();
+
   const [search, setSearch] = useState("");
   const [showPinned, setShowPinned] = useState(true);
-  const [pinnedUsers, setPinnedUsers] = useState([
-    { id: 1, name: "Alice", picture: aliceImg },
-    { id: 2, name: "Bob", picture: "" },
-    { id: 3, name: "Charlie", picture: "" },
-  ]);
+  const [showChats, setShowChats] = useState(true);
+  const [pinnedUsers, setPinnedUsers] = useState([]);
   const [mutedUsers, setMutedUsers] = useState([]);
   const [blockedUsers, setBlockedUsers] = useState([]);
-  const [showChats, setShowChats] = useState(true);
-  const [chats, setChats] = useState([
-    {
-      id: 1,
-      name: "Alice",
-      picture: aliceImg,
-      lastMessage: "Hey!",
-      timestamp: formatTimestamp("2025-08-20T23:45:00"),
-    },
-    {
-      id: 2,
-      name: "Sudhir Sharma",
-      picture: "",
-      lastMessage: "Let's meet tomorrow",
-      timestamp: formatTimestamp("2025-08-20T19:20:00"),
-    },
-    {
-      id: 3,
-      name: "Charlie",
-      picture: "",
-      lastMessage: "Got it",
-      timestamp: formatTimestamp("2025-08-20T06:30:00"),
-    },
-    {
-      id: 4,
-      name: "David",
-      picture: "",
-      lastMessage: "See you soon",
-      timestamp: formatTimestamp("2025-08-19T12:00:00"),
-    },
-    {
-      id: 5,
-      name: "Eve",
-      picture: "",
-      lastMessage: "Thanks!",
-      timestamp: formatTimestamp("2025-08-18T15:45:00"),
-    },
-    {
-      id: 6,
-      name: "Frank",
-      picture: "",
-      lastMessage: "OK",
-      timestamp: formatTimestamp("2025-08-18T11:15:00"),
-    },
-    {
-      id: 7,
-      name: "Grace",
-      picture: "",
-      lastMessage: "Sure",
-      timestamp: formatTimestamp("2025-08-17T20:00:00"),
-    },
-    {
-      id: 8,
-      name: "Heidi",
-      picture: "",
-      lastMessage: "No problem",
-      timestamp: formatTimestamp("2025-08-17T08:30:00"),
-    },
-    {
-      id: 9,
-      name: "Ivan",
-      picture: "",
-      lastMessage: "Let's go",
-      timestamp: formatTimestamp("2025-08-16T14:50:00"),
-    },
-    {
-      id: 10,
-      name: "Judy",
-      picture: "",
-      lastMessage: "Gotcha",
-      timestamp: formatTimestamp("2025-08-16T09:10:00"),
-    },
-    {
-      id: 11,
-      name: "Karl",
-      picture: "",
-      lastMessage: "Fine",
-      timestamp: formatTimestamp("2025-08-15T18:25:00"),
-    },
-    {
-      id: 12,
-      name: "Leo",
-      picture: "",
-      lastMessage: "Thanks",
-      timestamp: formatTimestamp("2025-08-15T11:40:00"),
-    },
-    {
-      id: 13,
-      name: "Mallory",
-      picture: "",
-      lastMessage: "Cool",
-      timestamp: formatTimestamp("2025-08-14T16:30:00"),
-    },
-    {
-      id: 14,
-      name: "Nina",
-      picture: "",
-      lastMessage: "See you soon",
-      timestamp: formatTimestamp("2025-08-14T08:10:00"),
-    },
-    {
-      id: 15,
-      name: "Oscar",
-      picture: "",
-      lastMessage: "Alright",
-      timestamp: formatTimestamp("2025-08-13T22:50:00"),
-    },
-  ]);
 
+  const { getToken } = useAuth();
+  const loadMoreRef = useRef(null);
+
+  /* ------------------ Conversations Query ------------------ */
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
+    useInfiniteQuery({
+      queryKey: ["conversations"],
+      queryFn: async ({ pageParam }) => {
+        const token = await getToken();
+        return getMyConversations({ pageParam, token });
+      },
+      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+      staleTime: 1000 * 60 * 2,
+      cacheTime: 1000 * 60 * 10,
+      refetchOnWindowFocus: false,
+    });
+
+  const chats = data?.pages.flatMap((page) => page.conversations) || [];
+
+  /* ------------------ Infinite Scroll ------------------ */
+  useEffect(() => {
+    if (!hasNextPage) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => entry.isIntersecting && fetchNextPage(),
+      { threshold: 1 }
+    );
+
+    if (loadMoreRef.current) observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage]);
+
+  /* ------------------ Filters ------------------ */
   const filteredChats = chats.filter((chat) =>
-    chat.name.toLowerCase().includes(search.toLowerCase())
+    chat.partner.fullName.toLowerCase().includes(search.toLowerCase())
   );
 
   const visibleChats = filteredChats.filter(
-    (chat) => !blockedUsers.includes(chat.id)
+    (chat) => !blockedUsers.includes(chat.conversationId)
   );
 
-  const addPin = (chatToPin) => {
-    setPinnedUsers((pinnedUsers) => [chatToPin, ...pinnedUsers]);
-  };
-
-  const removePin = (userId) => {
-    setPinnedUsers((prev) => prev.filter((user) => user.id !== userId));
-  };
-
-  const toggleMute = (chat) => {
-    setMutedUsers((prev) =>
-      prev.includes(chat.id)
-        ? prev.filter((id) => id !== chat.id)
-        : [...prev, chat.id]
+  /* ------------------ Actions ------------------ */
+  const addPin = (chat) =>
+    setPinnedUsers((prev) =>
+      prev.some((c) => c.conversationId === chat.conversationId)
+        ? prev
+        : [chat, ...prev]
     );
-  };
 
-  const toggleBlock = (chat) => {
-    setBlockedUsers((prev) => {
-      if (prev.includes(chat.id)) {
-        // Unblock
-        return prev.filter((id) => id !== chat.id);
-      } else {
-        // Block → remove from pinned
-        setPinnedUsers((pins) => pins.filter((user) => user.id !== chat.id));
-        return [...prev, chat.id];
-      }
-    });
-  };
+  const removePin = (id) =>
+    setPinnedUsers((prev) => prev.filter((c) => c.conversationId !== id));
 
-  const deleteChat = (chatId) => {
-    setChats((prev) => prev.filter((chat) => chat.id !== chatId));
+  const toggleMute = (chat) =>
+    setMutedUsers((prev) =>
+      prev.includes(chat.conversationId)
+        ? prev.filter((id) => id !== chat.conversationId)
+        : [...prev, chat.conversationId]
+    );
 
-    setPinnedUsers((prev) => prev.filter((user) => user.id !== chatId));
-  };
+  const toggleBlock = (chat) =>
+    setBlockedUsers((prev) =>
+      prev.includes(chat.conversationId)
+        ? prev.filter((id) => id !== chat.conversationId)
+        : [...prev, chat.conversationId]
+    );
 
-  const closeChat = () => {
-    navigate(-1);
-  };
+  const closeChat = () => navigate(-1);
 
+  /* ------------------ UI ------------------ */
   return (
     <div className="flex h-full overflow-hidden">
       {/* Left Panel */}
-      <div className="w-80 h-full flex flex-col bg-background text-foreground border-r-2 border-border">
-        {/* Search */}
-        <div className="p-4 bg-card text-card-foreground">
+      <div className="w-80 flex flex-col border-r-2 border-border">
+        <div className="p-4">
           <Input
             placeholder="Search chats..."
             value={search}
@@ -224,236 +138,125 @@ export default function ChatWindow() {
           />
         </div>
 
-        {/* Pinned + Chats Wrapper */}
-        <div className="p-4 bg-card text-card-foreground border-t-2 border-border flex-1 flex flex-col overflow-hidden">
-          {/* Pinned Users */}
+        <div className="p-4 flex-1 overflow-hidden">
+          {/* All Chats */}
           <div className="flex items-center justify-between mb-2">
-            <span className="font-semibold">Pinned ({pinnedUsers.length})</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full w-7 h-7"
-              onClick={() => setShowPinned(!showPinned)}
-            >
-              {showPinned ? (
-                <ChevronUp className="w-4 h-4" />
-              ) : (
-                <ChevronDown className="w-4 h-4" />
-              )}
-            </Button>
-          </div>
-
-          {showPinned && (
-            <div className="flex mb-4 space-x-1 overflow-x-auto flex-nowrap">
-              {pinnedUsers.map((user, index) => (
-                <div key={user.id} className="relative group">
-                  {/* Wrap in div with relative positioning */}
-                  <NavLink
-                    to={`chat/${user.id}`}
-                    className="flex flex-col items-center gap-1 p-1 rounded-sm transition-colors cursor-default"
-                  >
-                    {({ isActive }) => (
-                      <div className="flex flex-col items-center gap-1">
-                        <Avatar className="w-12 h-12 border border-border shadow-sm cursor-pointer">
-                          <AvatarImage src={user.picture} alt={user.name} />
-                          <AvatarFallback
-                            className={`flex items-center justify-center font-medium ${getAvatarGradient(
-                              index
-                            )}`}
-                          >
-                            {user.name.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-
-                        <span
-                          className={`text-xs truncate max-w-[60px] text-center block ${
-                            isActive
-                              ? "text-card-foreground border-b-2 border-accent"
-                              : "text-card-foreground"
-                          }`}
-                        >
-                          {user.name}
-                        </span>
-                      </div>
-                    )}
-                  </NavLink>
-                  {/* Unpin badge - appears on hover */}
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    onClick={(e) => {
-                      e.preventDefault(); // Prevent navigation
-                      removePin(user.id);
-                    }}
-                    className="absolute top-0 right-0 h-5 w-5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                    title="Unpin chat"
-                  >
-                    <X size={12} />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* All Chats Header */}
-          <div className="flex items-center justify-between mt-2 mb-2">
             <span className="font-semibold">
               All Chats ({visibleChats.length})
             </span>
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full w-7 h-7"
               onClick={() => setShowChats(!showChats)}
             >
-              {showChats ? (
-                <ChevronUp className="w-4 h-4" />
-              ) : (
-                <ChevronDown className="w-4 h-4" />
-              )}
+              {showChats ? <ChevronUp /> : <ChevronDown />}
             </Button>
           </div>
 
-          {/* Scrollable Chat List */}
           {showChats && (
-            <div className="flex-1 overflow-y-auto pb-16 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+              {isLoading && <Spinner />}
+
               {visibleChats.map((chat, index) => (
                 <NavLink
-                  key={chat.id}
-                  to={`/chat/${chat.id}`}
+                  key={chat.conversationId}
+                  to={`/chat/${chat.conversationId}`}
                   className={({ isActive }) =>
-                    `flex items-center p-3 transition-colors rounded-md cursor-pointer hover:bg-accent/10 ${
-                      isActive ? "bg-accent/20 text-accent-content" : ""
+                    `flex items-center p-3 rounded-md hover:bg-accent/10 ${
+                      isActive ? "bg-accent/20" : ""
                     }`
                   }
                 >
-                  <Avatar className="w-12 h-12 border border-border shadow-sm">
-                    <AvatarImage src={chat.picture} alt={chat.name} />
-                    <AvatarFallback
-                      className={`flex items-center justify-center font-medium ${getAvatarGradient(
-                        index
-                      )}`}
-                    >
-                      {chat.name.charAt(0)}
+                  <Avatar className="w-12 h-12">
+                    <AvatarImage src={chat.partner.profileImageUrl} />
+                    <AvatarFallback className={getAvatarGradient(index)}>
+                      {chat.partner.fullName.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
 
-                  <div className="flex flex-col flex-1 ml-3 min-w-0">
-                    <div className="flex items-center justify-between">
-                      {/* <span className="font-medium">{chat.name}</span> */}
-                      <span
-                        className="font-medium truncate block max-w-20"
-                        title={chat.name}
-                      >
-                        {chat.name.split(" ").slice(0, 2).join(" ")}
+                  <div className="flex-1 ml-3 min-w-0">
+                    <div className="flex justify-between">
+                      <span className="font-medium truncate">
+                        {chat.partner.fullName}
                       </span>
-
                       <span className="text-xs text-muted-foreground">
-                        {chat.timestamp}
+                        {formatTimestamp(chat.updatedAt)}
                       </span>
                     </div>
-                    <span className="text-sm overflow-hidden whitespace-nowrap truncate text-muted-foreground">
-                      {chat.lastMessage}
+                    <span className="text-sm truncate text-muted-foreground">
+                      {chat.lastMessage?.text || "No messages yet"}
                     </span>
                   </div>
 
-                  {/* Muted Badge Icon */}
-                  {mutedUsers.includes(chat.id) && (
+                  {mutedUsers.includes(chat.conversationId) && (
                     <VolumeX className="w-4 h-4 text-primary" />
                   )}
 
-                  {/* More menu */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 rounded-full hover:bg-card 
-             focus-visible:ring-0 focus-visible:outline-none 
-             data-[state=open]:bg-transparent"
-                        onClick={(e) => e.preventDefault()} // prevent NavLink click
+                        onClick={(e) => e.preventDefault()}
                       >
-                        <MoreVertical className="h-5 w-5 text-card-foreground" />
+                        <MoreVertical />
                       </Button>
                     </DropdownMenuTrigger>
 
                     <DropdownMenuContent align="end">
-                      {/* Pin/Unpin */}
                       <DropdownMenuItem
-                        onClick={() => {
-                          if (pinnedUsers.some((user) => user.id === chat.id)) {
-                            removePin(chat.id);
-                          } else {
-                            addPin(chat);
-                          }
-                        }}
-                        className="flex items-center gap-2"
+                        onClick={() =>
+                          pinnedUsers.some(
+                            (c) => c.conversationId === chat.conversationId
+                          )
+                            ? removePin(chat.conversationId)
+                            : addPin(chat)
+                        }
                       >
-                        {pinnedUsers.some((user) => user.id === chat.id) ? (
+                        {pinnedUsers.some(
+                          (c) => c.conversationId === chat.conversationId
+                        ) ? (
                           <>
-                            <PinOff size={16} className="text-primary" />
-                            <span>Unpin</span>
+                            <PinOff size={16} /> Unpin
                           </>
                         ) : (
                           <>
-                            <Pin size={16} className="text-primary" />
-                            <span>Pin</span>
+                            <Pin size={16} /> Pin
                           </>
                         )}
                       </DropdownMenuItem>
 
-                      {/* Mute / Unmute */}
-                      <DropdownMenuItem
-                        onClick={() => toggleMute(chat)}
-                        className="flex items-center gap-2"
-                      >
-                        {mutedUsers.includes(chat.id) ? (
+                      <DropdownMenuItem onClick={() => toggleMute(chat)}>
+                        {mutedUsers.includes(chat.conversationId) ? (
                           <>
-                            <Volume size={16} className="text-green-600" />
-                            <span>Unmute</span>
+                            <Volume size={16} /> Unmute
                           </>
                         ) : (
                           <>
-                            <VolumeX size={16} className="text-red-600" />
-                            <span>Mute</span>
+                            <VolumeX size={16} /> Mute
                           </>
                         )}
                       </DropdownMenuItem>
 
-                      {/* Block (only if not already blocked) */}
-                      {!blockedUsers.includes(chat.id) && (
-                        <DropdownMenuItem
-                          onClick={() => toggleBlock(chat)}
-                          className="flex items-center gap-2"
-                        >
-                          <UserX size={16} className="text-red-600" />
-                          <span>Block</span>
-                        </DropdownMenuItem>
-                      )}
-
-                      {/* Delete */}
-                      <DropdownMenuItem
-                        onClick={() => deleteChat(chat.id)}
-                        className="flex items-center gap-2"
-                      >
-                        <Trash2 size={16} className="text-destructive" />
-                        <span>Delete</span>
+                      <DropdownMenuItem onClick={() => toggleBlock(chat)}>
+                        <UserX size={16} /> Block
                       </DropdownMenuItem>
 
-                      {/* Close (only if active chat) */}
-                      {chatId === String(chat.id) && (
-                        <DropdownMenuItem
-                          onClick={() => closeChat()}
-                          className="flex items-center gap-2"
-                        >
-                          <X size={16} className="text-primary" />
-                          <span>Close</span>
+                      {chatId === chat.conversationId && (
+                        <DropdownMenuItem onClick={closeChat}>
+                          <X size={16} /> Close
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </NavLink>
               ))}
+
+              {hasNextPage && (
+                <div ref={loadMoreRef} className="py-4 text-center">
+                  {isFetchingNextPage && <Spinner />}
+                </div>
+              )}
             </div>
           )}
         </div>

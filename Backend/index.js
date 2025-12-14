@@ -1,34 +1,47 @@
-import dotenv from "dotenv";
-import mongoose from "mongoose";
-import http from "http";
-import logger from "./utils/logger.js";
-import socketServer from "./socket/socket.js";
-import app from "./app.js";
-
-// Handle uncaught exceptions
-process.on("uncaughtException", (err) => {
-  logger.error(`💥 UNCAUGHT EXCEPTION: ${err.name} | ${err.message}`);
-  process.exit(1);
-});
-
-// Load env
+const dotenv = require("dotenv");
+const mongoose = require("mongoose");
+const http = require("http");
+const logger = require("./utils/logger");
+const socketServer = require("./socket/socket");
 dotenv.config();
+const app = require("./app");
+
+// =======================
+// Load Environment
+// =======================
 const env = process.env.NODE_ENV || "development";
 
+// =======================
 // Config
+// =======================
 const PORT = process.env.PORT || 5000;
 const SERVER_URL = process.env.SERVER_URL || `http://localhost:${PORT}`;
 const DB_URI = process.env.DB_URI;
 
 let server;
 
-// Create HTTP server (IMPORTANT for Socket.IO)
+// =======================
+// Handle uncaught exceptions
+// =======================
+process.on("uncaughtException", (err) => {
+  logger.error(`💥 UNCAUGHT EXCEPTION: ${err.name} | ${err.message}`);
+  process.exit(1);
+});
+
+// =======================
+// Create HTTP Server
+// (Required for Socket.IO)
+// =======================
 const httpServer = http.createServer(app);
 
-// Initialize socket server
+// =======================
+// Initialize Socket.IO
+// =======================
 socketServer(httpServer);
 
-// Connect to MongoDB
+// =======================
+// Connect MongoDB
+// =======================
 const connectDB = async (retries = 5) => {
   while (retries) {
     try {
@@ -52,17 +65,22 @@ const connectDB = async (retries = 5) => {
   process.exit(1);
 };
 
+// =======================
+// Start Server
+// =======================
 const startServer = () => {
   server = httpServer.listen(PORT, () => {
     logger.info(`🚀 Server running at ${SERVER_URL} [${env}]`);
 
     if (env === "production") {
-      console.log(`✔️  Server started on port ${PORT} [production]`);
+      console.log(`✔️ Server started on port ${PORT} [production]`);
     }
   });
 };
 
-// Graceful shutdowns
+// =======================
+// Graceful Shutdowns
+// =======================
 process.on("unhandledRejection", (err) => {
   logger.error(`💥 UNHANDLED REJECTION: ${err.name} | ${err.message}`);
   shutdown(1);
@@ -89,5 +107,7 @@ const shutdown = async (exitCode) => {
   }
 };
 
-// Init everything
+// =======================
+// Init
+// =======================
 connectDB();

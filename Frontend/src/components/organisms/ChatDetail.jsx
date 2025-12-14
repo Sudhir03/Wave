@@ -1,11 +1,21 @@
+/* =========================
+   React & Router Imports
+========================= */
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext, useParams } from "react-router-dom";
+
+/* =========================
+   UI Components
+========================= */
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/atoms/Avatar";
 import { Input } from "@/components/atoms/Input";
 import { Button } from "@/components/atoms/Button";
+
+/* =========================
+   Feature Components
+========================= */
 import { EmojiPopover } from "@/components/molecules/EmojiPopover";
 import { MediaPickerPopover } from "@/components/molecules/MediaPickerPopover";
-import { BellOff, Pin, PinOff, Send, UserX } from "lucide-react";
 import { MediaGallery } from "@/components/organisms/MediaGallery";
 import { ImageAttachment } from "@/components/molecules/media/ImageAttachment";
 import { VideoAttachment } from "@/components/molecules/media/VideoAttachment";
@@ -17,183 +27,40 @@ import { ChatSearch } from "@/components/molecules/ChatSearch";
 import { MoreOptionsPopover } from "@/components/molecules/MoreOptionsPopover";
 import { CallPopover } from "@/components/molecules/CallPopover";
 
-// Sample chat list
-const chats = [
-  {
-    id: 1,
-    name: "Alice",
-    picture: "/alice.png",
-    isOnline: true,
-    lastSeen: new Date(),
-  },
-  {
-    id: 2,
-    name: "Bob",
-    picture: "/bob.png",
-    isOnline: false,
-    lastSeen: new Date("2025-09-07T21:30:00"),
-  },
-  {
-    id: 3,
-    name: "Charlie",
-    picture: "",
-    isOnline: false,
-    lastSeen: new Date("2025-09-06T18:15:00"),
-  },
-];
+/* =========================
+   Icons
+========================= */
+import { BellOff, Pin, PinOff, Send, UserX } from "lucide-react";
 
-// Initial messages
-const initialMessages = [
-  {
-    id: 1,
-    text: "Hey",
-    sender: "other",
-    timestamp: new Date("2025-09-08T09:15:05"),
-    media: [],
-  },
-  {
-    id: 2,
-    text: "Check out these files",
-    sender: "other",
-    timestamp: new Date("2025-09-08T09:15:40"),
-    media: [
-      {
-        type: "image",
-        url: "https://images.unsplash.com/photo-1538998073820-4dfa76300194?q=80&w=300",
-      },
-      {
-        type: "image",
-        url: "https://images.unsplash.com/photo-1538998073820-4dfa76300194?q=80&w=300",
-      },
-      {
-        type: "image",
-        url: "https://images.unsplash.com/photo-1538998073820-4dfa76300194?q=80&w=300",
-      },
-      {
-        type: "image",
-        url: "https://images.unsplash.com/photo-1538998073820-4dfa76300194?q=80&w=300",
-      },
-      {
-        type: "image",
-        url: "https://images.unsplash.com/photo-1538998073820-4dfa76300194?q=80&w=300",
-      },
-      {
-        type: "image",
-        url: "https://images.unsplash.com/photo-1538998073820-4dfa76300194?q=80&w=300",
-      },
-      {
-        type: "image",
-        url: "https://images.unsplash.com/photo-1538998073820-4dfa76300194?q=80&w=300",
-      },
-    ],
-  },
-  {
-    id: 3,
-    text: "I’m good, thanks!",
-    sender: "me",
-    timestamp: new Date("2025-09-08T09:16:10"),
-    media: [
-      {
-        type: "video",
-        url: "https://www.w3schools.com/html/mov_bbb.mp4",
-        poster:
-          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
-      },
-      {
-        type: "video",
-        url: "https://www.w3schools.com/html/mov_bbb.mp4",
-        poster:
-          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
-      },
-      {
-        type: "video",
-        url: "https://www.w3schools.com/html/mov_bbb.mp4",
-        poster:
-          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
-      },
-      {
-        type: "video",
-        url: "https://www.w3schools.com/html/mov_bbb.mp4",
-        poster:
-          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
-      },
-      {
-        type: "video",
-        url: "https://www.w3schools.com/html/mov_bbb.mp4",
-        poster:
-          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
-      },
-      {
-        type: "video",
-        url: "https://www.w3schools.com/html/mov_bbb.mp4",
-        poster:
-          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
-      },
-    ],
-  },
-  {
-    id: 4,
-    text: "Check out these files",
-    sender: "other",
-    timestamp: new Date("2025-09-08T09:15:40"),
-    media: [
-      {
-        type: "video",
-        url: "https://www.w3schools.com/html/mov_bbb.mp4",
-        poster:
-          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
-      },
-      {
-        type: "video",
-        url: "https://www.w3schools.com/html/mov_bbb.mp4",
-        poster:
-          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
-      },
-      {
-        type: "video",
-        url: "https://www.w3schools.com/html/mov_bbb.mp4",
-        poster:
-          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
-      },
-      {
-        type: "video",
-        url: "https://www.w3schools.com/html/mov_bbb.mp4",
-        poster:
-          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
-      },
-      {
-        type: "video",
-        url: "https://www.w3schools.com/html/mov_bbb.mp4",
-        poster:
-          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
-      },
-      {
-        type: "video",
-        url: "https://www.w3schools.com/html/mov_bbb.mp4",
-        poster:
-          "https://peach.blender.org/wp-content/uploads/title_anouncement.jpg",
-      },
-    ],
-  },
-  {
-    id: 5,
-    text: "I’m good, thanks!",
-    sender: "me",
-    timestamp: new Date("2025-09-08T09:16:10"),
-    media: [
-      {
-        type: "image",
-        url: "https://images.unsplash.com/photo-1538998073820-4dfa76300194?q=80&w=300",
-      },
-    ],
-  },
-];
+/* =========================
+   Data & State Management
+========================= */
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/clerk-react";
+import { getMessages } from "@/api/chat";
 
+/* =========================
+   Socket
+========================= */
+import socket from "@/socket";
+
+/* =========================
+   Helpers
+========================= */
 const formatTime = (date) =>
-  date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  new Date(date).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
+/* =========================================================
+   Chat Detail Component
+========================================================= */
 export default function ChatDetail() {
-  const { chatId, friendId } = useParams();
+  /* =========================
+     Route & Context
+  ========================= */
+  const { chatId } = useParams();
 
   const {
     pinnedUsers,
@@ -205,34 +72,148 @@ export default function ChatDetail() {
     toggleBlock,
   } = useOutletContext();
 
-  const chat = chats.find((c) => c.id.toString() === chatId);
+  /* =========================
+     Static Chat (Mock)
+  ========================= */
+  const chat = {
+    _id: 1,
+    name: "Alice",
+    picture: "/alice.png",
+    isOnline: true,
+    lastSeen: new Date(),
+  };
 
+  /* =========================
+     Local State
+  ========================= */
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState(initialMessages);
-
-  const messagesEndRef = useRef(null);
-
+  const [isTyping, setIsTyping] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryMedia, setGalleryMedia] = useState([]);
   const [galleryStartIndex, setGalleryStartIndex] = useState(0);
-
   const [activeMediaId, setActiveMediaId] = useState(null);
 
+  /* =========================
+     Refs
+  ========================= */
+  const messagesEndRef = useRef(null);
+  const topRef = useRef(null);
+
+  /* =========================
+     Auth & Query
+  ========================= */
+  const { getToken, userId } = useAuth();
+  const queryClient = useQueryClient();
+
+  /* =========================
+     Messages Query (Infinite)
+  ========================= */
+  const { data, fetchNextPage, hasNextPage } = useInfiniteQuery({
+    queryKey: ["messages", chatId],
+    enabled: !!chatId,
+
+    queryFn: async ({ pageParam }) => {
+      const token = await getToken();
+      return getMessages({
+        conversationId: chatId,
+        cursor: pageParam,
+        token,
+      });
+    },
+
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+
+    staleTime: 30 * 1000,
+    cacheTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  /* =========================
+     Flatten Messages
+  ========================= */
+  const messages =
+    data?.pages.flatMap((page) =>
+      page.messages.map((m) => ({
+        ...m,
+        id: m._id,
+      }))
+    ) || [];
+
+  /* =========================
+     Socket: Typing Indicator
+  ========================= */
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
+    socket.on("user_typing", () => setIsTyping(true));
+    return () => socket.off("user_typing");
+  }, []);
+
+  /* =========================
+     Infinite Scroll (Top)
+  ========================= */
+  useEffect(() => {
+    if (!hasNextPage || !topRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => entry.isIntersecting && fetchNextPage(),
+      { threshold: 1 }
+    );
+
+    observer.observe(topRef.current);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage]);
+
+  /* =========================
+     Auto Scroll to Bottom
+  ========================= */
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleOpenGallery = (msgMedia, startIndex = 0) => {
-    const formattedMedia = msgMedia.map((m, i) => ({
-      id: i,
-      type: m.type,
-      src: m.url,
-      thumbnail: m.poster || m.url,
-    }));
+  /* =========================
+     Socket: Join & Receive Messages
+  ========================= */
+  useEffect(() => {
+    if (!chatId) return;
 
-    setGalleryMedia(formattedMedia);
+    socket.emit("join_chat", chatId);
+
+    socket.on("receive_message", (data) => {
+      if (data.senderId === userId) return;
+
+      queryClient.setQueryData(["messages", chatId], (old) => {
+        if (!old) return old;
+
+        return {
+          ...old,
+          pages: old.pages.map((page, idx) =>
+            idx === old.pages.length - 1
+              ? { ...page, messages: [...page.messages, data] }
+              : page
+          ),
+        };
+      });
+    });
+
+    return () => {
+      socket.emit("leave_chat", chatId);
+      socket.off("receive_message");
+    };
+  }, [chatId, queryClient, userId]);
+
+  /* =========================
+     Handlers
+  ========================= */
+  const handleTyping = () => socket.emit("typing", chatId);
+
+  const handleOpenGallery = (msgMedia, startIndex = 0) => {
+    setGalleryMedia(
+      msgMedia.map((m, i) => ({
+        id: i,
+        type: m.type,
+        src: m.url,
+        thumbnail: m.poster || m.url,
+      }))
+    );
     setGalleryStartIndex(startIndex);
     setIsGalleryOpen(true);
   };
@@ -240,16 +221,30 @@ export default function ChatDetail() {
   const handleSend = (mediaFiles = []) => {
     if (!message.trim() && mediaFiles.length === 0) return;
 
-    setMessages([
-      ...messages,
-      {
-        id: Date.now(),
-        text: message,
-        sender: "me",
-        timestamp: new Date(),
-        media: mediaFiles,
-      },
-    ]);
+    const msgData = {
+      id: Date.now(),
+      chatId,
+      content: message,
+      senderId: userId,
+      timestamp: new Date(),
+      media: mediaFiles,
+    };
+
+    socket.emit("send_message", msgData);
+
+    queryClient.setQueryData(["messages", chatId], (old) => {
+      if (!old) return old;
+
+      return {
+        ...old,
+        pages: old.pages.map((page, idx) =>
+          idx === old.pages.length - 1
+            ? { ...page, messages: [...page.messages, msgData] }
+            : page
+        ),
+      };
+    });
+
     setMessage("");
   };
 
@@ -266,19 +261,23 @@ export default function ChatDetail() {
       <div className="flex items-center justify-between border-b-2 border-border p-2.5">
         <div className="flex items-center gap-2">
           <Avatar className="w-12 h-12">
-            <AvatarImage src={chat.picture} alt={chat.name} />
+            <AvatarImage src={chat?.picture} alt={chat?.name} />
             <AvatarFallback className="bg-linear-to-r from-fuchsia-500 to-purple-600 text-white font-medium">
-              {chat.name.charAt(0)}
+              {chat?.name.charAt(0)}
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col leading-tight">
             <span className="font-semibold text-foreground max-w-48 truncate">
-              {chat.name}
+              {chat?.name}
             </span>
             <span className="text-sm text-secondary">
-              {chat.isOnline
-                ? "Online"
-                : `Last seen ${formatLastSeen(chat.lastSeen)}`}
+              {isTyping ? (
+                <span className="italic text-primary">typing...</span>
+              ) : chat?.isOnline ? (
+                "Online"
+              ) : (
+                `Last seen ${formatLastSeen(chat?.lastSeen)}`
+              )}
             </span>
           </div>
         </div>
@@ -328,6 +327,7 @@ export default function ChatDetail() {
 
       {/* Messages */}
       <div className="flex-1 bg-background overflow-y-auto p-4 space-y-2 custom-scrollbar">
+        <div ref={topRef} />
         {messages.map((msg, i) => {
           const isLastInMinute =
             !messages[i + 1] ||
@@ -335,22 +335,22 @@ export default function ChatDetail() {
 
           return (
             <div
-              key={msg.id}
-              id={`message-${msg.id}`}
+              key={i}
+              id={`message-${msg._id}`}
               className={`flex flex-col ${
-                msg.sender === "me" ? "items-end" : "items-start"
+                msg.sender === userId ? "items-end" : "items-start"
               } space-y-1`}
             >
               {/* Message text */}
-              {msg?.text && (
+              {msg?.content && (
                 <div
                   className={`max-w-xs px-3 py-2 rounded-lg ${
-                    msg.sender === "me"
+                    msg.sender === userId
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted text-foreground"
                   }`}
                 >
-                  {msg.text}
+                  {msg.content}
                 </div>
               )}
 
@@ -433,10 +433,10 @@ export default function ChatDetail() {
                               fileSize={m.fileSize}
                               audioUrl={m.url}
                               isActive={
-                                activeMediaId === `audio-${msg.id}-${idx}`
+                                activeMediaId === `audio-${msg._id}-${idx}`
                               }
                               onPlay={() =>
-                                setActiveMediaId(`audio-${msg.id}-${idx}`)
+                                setActiveMediaId(`audio-${msg._id}-${idx}`)
                               }
                               onMenuClick={() =>
                                 console.log("Audio menu clicked")
@@ -459,7 +459,7 @@ export default function ChatDetail() {
               {isLastInMinute && (
                 <div
                   className={`text-xs text-muted-foreground mt-1 ${
-                    msg.sender === "me" ? "text-right" : "text-left"
+                    msg.sender === userId ? "text-right" : "text-left"
                   }`}
                 >
                   {formatTime(msg.timestamp)}
@@ -483,7 +483,10 @@ export default function ChatDetail() {
           type="text"
           placeholder="Type a message..."
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => {
+            setMessage(e.target.value);
+            handleTyping();
+          }}
           className="flex-1"
         />
         <Button
