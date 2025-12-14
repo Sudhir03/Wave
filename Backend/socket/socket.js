@@ -1,7 +1,9 @@
 const { Server } = require("socket.io");
 
+let io;
+
 const socketServer = (server) => {
-  const io = new Server(server, {
+  io = new Server(server, {
     cors: {
       origin: "http://localhost:5173",
       methods: ["GET", "POST"],
@@ -11,25 +13,20 @@ const socketServer = (server) => {
   io.on("connection", (socket) => {
     console.log("Socket connected:", socket.id);
 
-    socket.on("join_chat", (chatId) => {
-      socket.join(chatId);
-      console.log(`User joined room: ${chatId}`);
+    socket.on("join_chat", (conversationId) => {
+      socket.join(conversationId);
     });
 
-    socket.on("send_message", (data) => {
-      io.to(data.chatId).emit("receive_message", data);
+    socket.on("leave_chat", (conversationId) => {
+      socket.leave(conversationId);
     });
 
-    socket.on("typing_start", (chatId) => {
-      socket.to(chatId).emit("user_typing_start");
+    socket.on("typing_start", (conversationId) => {
+      socket.to(conversationId).emit("user_typing_start");
     });
 
-    socket.on("typing_stop", (chatId) => {
-      socket.to(chatId).emit("user_typing_stop");
-    });
-
-    socket.on("leave_chat", (chatId) => {
-      socket.leave(chatId);
+    socket.on("typing_stop", (conversationId) => {
+      socket.to(conversationId).emit("user_typing_stop");
     });
 
     socket.on("disconnect", () => {
@@ -38,4 +35,9 @@ const socketServer = (server) => {
   });
 };
 
-module.exports = socketServer;
+const getIO = () => {
+  if (!io) throw new Error("Socket.io not initialized");
+  return io;
+};
+
+module.exports = { socketServer, getIO };

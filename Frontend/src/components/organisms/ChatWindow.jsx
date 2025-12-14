@@ -125,8 +125,6 @@ export default function ChatWindow() {
 
   const closeChat = () => navigate(-1);
 
-  console.log(visibleChats);
-
   /* ------------------ UI ------------------ */
   return (
     <div className="flex h-full overflow-hidden">

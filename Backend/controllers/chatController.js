@@ -4,6 +4,8 @@ const Message = require("../models/messageModel");
 const User = require("../models/userModel");
 const catchAsync = require("../utils/catchAsync");
 
+const { getIO } = require("../socket/socket");
+
 exports.getMyConversations = async (req, res) => {
   try {
     const userId = req.userId; // coming from auth middleware
@@ -199,14 +201,10 @@ exports.getUnifiedChatData = catchAsync(async (req, res) => {
 });
 
 // Send Message
+
 exports.sendMessage = catchAsync(async (req, res) => {
   const { userId } = req;
-
-  const {
-    conversationId, // Optional: Existing conversation ID
-    content,
-    media = [],
-  } = req.body;
+  const { conversationId, content, media = [] } = req.body;
 
   if (!content && media.length === 0) {
     return res.status(400).json({
@@ -215,101 +213,43 @@ exports.sendMessage = catchAsync(async (req, res) => {
     });
   }
 
-  let finalConversationId = conversationId;
-
-  // =====================================================
-  // SCENARIO A: NEW CHAT MODE (Conversation ID missing)
-  // =====================================================
-  if (!finalConversationId) {
-    if (!friendId) {
-      return res.status(400).json({
-        isSuccess: false,
-        message: "Either conversationId or friendId must be provided.",
-      });
-    }
-
-    // 1️⃣ Find Friendship
-    const friendship = await Friendship.findOne({
-      status: "accepted",
-      $or: [
-        { user1: userId, user2: friendId },
-        { user1: friendId, user2: userId },
-      ],
-    });
-
-    if (!friendship) {
-      return res.status(403).json({
-        isSuccess: false,
-        message: "Cannot send message without an established friendship.",
-      });
-    }
-
-    // 2️⃣ Conversation already exists
-    if (friendship.conversationId) {
-      finalConversationId = friendship.conversationId;
-    } else {
-      // 3️⃣ Create new conversation
-      const newConversation = new Conversation({
-        participants: [userId, friendId],
-      });
-
-      const savedConversation = await newConversation.save();
-      finalConversationId = savedConversation._id;
-
-      // 4️⃣ Attach conversation to friendship
-      friendship.conversationId = finalConversationId;
-      await friendship.save();
-    }
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation) {
+    return res.status(404).json({ message: "Conversation not found" });
   }
 
-  // =====================================================
-  // SCENARIO B: EXISTING CHAT MODE
-  // =====================================================
-  else {
-    const conversation = await Conversation.findById(finalConversationId);
-
-    if (!conversation) {
-      return res.status(404).json({
-        isSuccess: false,
-        message: "Conversation not found.",
-      });
-    }
-
-    if (!conversation.participants.some((p) => p.toString() === userId)) {
-      return res.status(403).json({
-        isSuccess: false,
-        message: "Unauthorized to send messages.",
-      });
-    }
+  if (!conversation.participants.includes(userId)) {
+    return res.status(403).json({ message: "Access denied" });
   }
 
-  // =====================================================
-  // CREATE & SAVE MESSAGE
-  // =====================================================
-  const newMessage = new Message({
-    conversationId: finalConversationId,
+  // 1️⃣ Save message
+  const message = await Message.create({
+    conversationId,
     sender: userId,
     content,
     media,
   });
 
-  const savedMessage = await newMessage.save();
+  // 2️⃣ Populate sender
+  const populatedMessage = await message.populate(
+    "sender",
+    "fullName profileImageUrl"
+  );
 
-  // =====================================================
-  // UPDATE CONVERSATION LAST MESSAGE
-  // =====================================================
-  await Conversation.findByIdAndUpdate(finalConversationId, {
-    lastMessage: savedMessage._id,
+  // 3️⃣ Update conversation
+  await Conversation.findByIdAndUpdate(conversationId, {
+    lastMessage: message._id,
     updatedAt: new Date(),
   });
 
-  // =====================================================
-  // RESPONSE
-  // =====================================================
+  // 4️⃣ EMIT REAL-TIME EVENT (🔥 IMPORTANT)
+  getIO()
+    .to(conversationId.toString())
+    .emit("receive_message", populatedMessage);
+
+  // 5️⃣ Respond to sender
   return res.status(201).json({
     isSuccess: true,
-    message: "Message sent successfully.",
-    conversationId: finalConversationId,
-    sentMessage: savedMessage,
+    sentMessage: populatedMessage,
   });
 });
