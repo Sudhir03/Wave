@@ -20,8 +20,12 @@ const socketServer = (server) => {
       io.to(data.chatId).emit("receive_message", data);
     });
 
-    socket.on("typing", (chatId) => {
-      socket.to(chatId).emit("user_typing");
+    socket.on("typing_start", (chatId) => {
+      socket.to(chatId).emit("user_typing_start");
+    });
+
+    socket.on("typing_stop", (chatId) => {
+      socket.to(chatId).emit("user_typing_stop");
     });
 
     socket.on("leave_chat", (chatId) => {

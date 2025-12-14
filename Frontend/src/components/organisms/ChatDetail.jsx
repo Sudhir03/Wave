@@ -35,9 +35,13 @@ import { BellOff, Pin, PinOff, Send, UserX } from "lucide-react";
 /* =========================
    Data & State Management
 ========================= */
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-react";
-import { getMessages } from "@/api/chat";
+import { getMessages, sendMessage } from "@/api/chat";
 
 /* =========================
    Socket
@@ -102,8 +106,11 @@ export default function ChatDetail() {
   /* =========================
      Auth & Query
   ========================= */
-  const { getToken, userId } = useAuth();
+  const { getToken } = useAuth();
   const queryClient = useQueryClient();
+  const profile = queryClient.getQueryData(["myProfile"]);
+
+  const userId = profile?.user?._id;
 
   /* =========================
      Messages Query (Infinite)
@@ -143,8 +150,13 @@ export default function ChatDetail() {
      Socket: Typing Indicator
   ========================= */
   useEffect(() => {
-    socket.on("user_typing", () => setIsTyping(true));
-    return () => socket.off("user_typing");
+    socket.on("user_typing_start", () => setIsTyping(true));
+    socket.on("user_typing_stop", () => setIsTyping(false));
+
+    return () => {
+      socket.off("user_typing_start");
+      socket.off("user_typing_stop");
+    };
   }, []);
 
   /* =========================
@@ -178,7 +190,7 @@ export default function ChatDetail() {
     socket.emit("join_chat", chatId);
 
     socket.on("receive_message", (data) => {
-      if (data.senderId === userId) return;
+      if (data.sender?._id === userId) return;
 
       queryClient.setQueryData(["messages", chatId], (old) => {
         if (!old) return old;
@@ -187,7 +199,12 @@ export default function ChatDetail() {
           ...old,
           pages: old.pages.map((page, idx) =>
             idx === old.pages.length - 1
-              ? { ...page, messages: [...page.messages, data] }
+              ? {
+                  ...page,
+                  messages: page.messages.some((m) => m._id === data._id)
+                    ? page.messages
+                    : [...page.messages, data],
+                }
               : page
           ),
         };
@@ -203,7 +220,13 @@ export default function ChatDetail() {
   /* =========================
      Handlers
   ========================= */
-  const handleTyping = () => socket.emit("typing", chatId);
+  const handleTyping = (value) => {
+    if (value.trim().length > 0) {
+      socket.emit("typing_start", chatId);
+    } else {
+      socket.emit("typing_stop", chatId);
+    }
+  };
 
   const handleOpenGallery = (msgMedia, startIndex = 0) => {
     setGalleryMedia(
@@ -218,31 +241,62 @@ export default function ChatDetail() {
     setIsGalleryOpen(true);
   };
 
+  /* =========================
+     sending
+  ========================= */
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async ({ content, media }) => {
+      const token = await getToken();
+
+      return sendMessage({
+        token,
+        conversationId: chatId,
+        content,
+        media,
+      });
+    },
+
+    onSuccess: (data) => {
+      const savedMessage = {
+        ...data.sentMessage,
+        sender: {
+          _id: userId,
+          profileImageUrl: profile?.user?.profileImageUrl,
+        },
+      };
+
+      socket.emit("send_message", {
+        ...savedMessage,
+        chatId,
+      });
+
+      queryClient.setQueryData(["messages", chatId], (old) => {
+        if (!old) return old;
+
+        return {
+          ...old,
+          pages: old.pages.map((page, idx) =>
+            idx === old.pages.length - 1
+              ? {
+                  ...page,
+                  messages: [...page.messages, savedMessage],
+                }
+              : page
+          ),
+        };
+      });
+    },
+  });
+
   const handleSend = (mediaFiles = []) => {
     if (!message.trim() && mediaFiles.length === 0) return;
 
-    const msgData = {
-      id: Date.now(),
-      chatId,
+    socket.emit("typing_stop", chatId);
+
+    sendMessageMutation.mutate({
       content: message,
-      senderId: userId,
-      timestamp: new Date(),
       media: mediaFiles,
-    };
-
-    socket.emit("send_message", msgData);
-
-    queryClient.setQueryData(["messages", chatId], (old) => {
-      if (!old) return old;
-
-      return {
-        ...old,
-        pages: old.pages.map((page, idx) =>
-          idx === old.pages.length - 1
-            ? { ...page, messages: [...page.messages, msgData] }
-            : page
-        ),
-      };
     });
 
     setMessage("");
@@ -338,14 +392,14 @@ export default function ChatDetail() {
               key={i}
               id={`message-${msg._id}`}
               className={`flex flex-col ${
-                msg.sender === userId ? "items-end" : "items-start"
+                msg.sender._id === userId ? "items-end" : "items-start"
               } space-y-1`}
             >
               {/* Message text */}
               {msg?.content && (
                 <div
                   className={`max-w-xs px-3 py-2 rounded-lg ${
-                    msg.sender === userId
+                    msg.sender._id === userId
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted text-foreground"
                   }`}
@@ -459,7 +513,7 @@ export default function ChatDetail() {
               {isLastInMinute && (
                 <div
                   className={`text-xs text-muted-foreground mt-1 ${
-                    msg.sender === userId ? "text-right" : "text-left"
+                    msg.sender._id === userId ? "text-right" : "text-left"
                   }`}
                 >
                   {formatTime(msg.timestamp)}
@@ -484,11 +538,14 @@ export default function ChatDetail() {
           placeholder="Type a message..."
           value={message}
           onChange={(e) => {
-            setMessage(e.target.value);
-            handleTyping();
+            const value = e.target.value;
+            setMessage(value);
+            handleTyping(value);
           }}
+          onBlur={() => socket.emit("typing_stop", chatId)}
           className="flex-1"
         />
+
         <Button
           onClick={() => handleSend()}
           size="icon"
