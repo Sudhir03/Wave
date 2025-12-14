@@ -8,9 +8,20 @@ import AppRoutes from "@/routes/AppRoutes";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getMyProfile } from "./api/users";
 
 function App() {
   const { getToken } = useAuth();
+
+  const {} = useQuery({
+    queryKey: ["myProfile"],
+    queryFn: async () => {
+      const token = await getToken();
+      return getMyProfile({ token });
+    },
+    select: (res) => res.user,
+  });
 
   useEffect(() => {
     const showToken = async () => {
