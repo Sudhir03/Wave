@@ -63,7 +63,7 @@ exports.getMyConversations = async (req, res) => {
 
 exports.getMessages = async (req, res) => {
   const { conversationId } = req.params;
-  const { cursor, limit = 20 } = req.query;
+  const { cursor, limit = 10 } = req.query;
   const userId = req.userId;
 
   // 1️⃣ Validate conversation
@@ -218,36 +218,52 @@ exports.sendMessage = catchAsync(async (req, res) => {
     return res.status(404).json({ message: "Conversation not found" });
   }
 
-  if (!conversation.participants.includes(userId)) {
+  if (
+    !conversation.participants.some((id) => id.toString() === userId.toString())
+  ) {
     return res.status(403).json({ message: "Access denied" });
   }
 
-  // 1️⃣ Save message
+  // 🔑 RECEIVER LOGIC
+  let receiverId = null;
+
+  if (conversation.type === "private") {
+    receiverId = conversation.participants.find(
+      (id) => id.toString() !== userId.toString()
+    );
+
+    if (!receiverId) {
+      return res.status(400).json({ message: "Receiver not found" });
+    }
+  }
+
+  // 1️⃣ CREATE MESSAGE
   const message = await Message.create({
     conversationId,
     sender: userId,
+    receiver: receiverId, // null for group chats
     content,
     media,
+    status: "sent",
   });
 
-  // 2️⃣ Populate sender
+  // 2️⃣ POPULATE SENDER
   const populatedMessage = await message.populate(
     "sender",
     "fullName profileImageUrl"
   );
 
-  // 3️⃣ Update conversation
+  // 3️⃣ UPDATE CONVERSATION
   await Conversation.findByIdAndUpdate(conversationId, {
     lastMessage: message._id,
     updatedAt: new Date(),
   });
 
-  // 4️⃣ EMIT REAL-TIME EVENT (🔥 IMPORTANT)
-  getIO()
-    .to(conversationId.toString())
-    .emit("receive_message", populatedMessage);
+  // 4️⃣ SOCKET EMIT
+  const io = getIO();
+  io.to(conversationId.toString()).emit("receive_message", populatedMessage);
 
-  // 5️⃣ Respond to sender
+  // 5️⃣ RESPONSE
   return res.status(201).json({
     isSuccess: true,
     sentMessage: populatedMessage,
