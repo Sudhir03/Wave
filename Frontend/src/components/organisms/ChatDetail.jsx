@@ -109,7 +109,6 @@ export default function ChatDetail() {
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
   const profile = queryClient.getQueryData(["myProfile"]);
-
   const userId = profile?.user?._id;
 
   /* =========================
@@ -266,11 +265,6 @@ export default function ChatDetail() {
         },
       };
 
-      socket.emit("send_message", {
-        ...savedMessage,
-        chatId,
-      });
-
       queryClient.setQueryData(["messages", chatId], (old) => {
         if (!old) return old;
 
@@ -345,32 +339,32 @@ export default function ChatDetail() {
           <MoreOptionsPopover
             options={[
               {
-                label: pinnedUsers.some((u) => u.id === chat.id)
+                label: pinnedUsers.some((u) => u.id === chat._id)
                   ? "Unpin"
                   : "Pin",
                 icon: {
-                  component: pinnedUsers.some((u) => u.id === chat.id)
+                  component: pinnedUsers.some((u) => u.id === chat._id)
                     ? PinOff
                     : Pin,
                 },
                 onClick: () => {
-                  if (pinnedUsers.some((u) => u.id === chat.id))
-                    removePin(chat.id);
+                  if (pinnedUsers.some((u) => u.id === chat._id))
+                    removePin(chat._id);
                   else
                     addPin({
-                      id: chat.id,
+                      id: chat._id,
                       name: chat.name,
                       picture: chat.picture,
                     });
                 },
               },
               {
-                label: mutedUsers.includes(chat.id) ? "Unmute" : "Mute",
+                label: mutedUsers.includes(chat._id) ? "Unmute" : "Mute",
                 icon: { component: BellOff },
                 onClick: () => toggleMute(chat),
               },
               {
-                label: blockedUsers.includes(chat.id) ? "Unblock" : "Block",
+                label: blockedUsers.includes(chat._id) ? "Unblock" : "Block",
                 icon: { component: UserX, props: { color: "red" } },
                 onClick: () => toggleBlock(chat),
               },

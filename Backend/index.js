@@ -2,7 +2,8 @@ const dotenv = require("dotenv");
 const mongoose = require("mongoose");
 const http = require("http");
 const logger = require("./utils/logger");
-const socketServer = require("./socket/socket");
+const { socketServer } = require("./socket/socket");
+
 dotenv.config();
 const app = require("./app");
 

@@ -14,6 +14,15 @@ import { getMyProfile } from "./api/users";
 function App() {
   const { getToken } = useAuth();
 
+  const {} = useQuery({
+    queryKey: ["myProfile"],
+    queryFn: async () => {
+      const token = await getToken();
+      return getMyProfile({ token });
+    },
+    select: (res) => res.user,
+  });
+
   useEffect(() => {
     const showToken = async () => {
       const token = await getToken({ template: "backend-api" });
