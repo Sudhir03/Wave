@@ -18,6 +18,7 @@ const globalErrorHandler = require("./controllers/errorController");
 const userRoutes = require("./routes/userRoutes");
 const friendRoutes = require("./routes/friendRoutes");
 const chatRoutes = require("./routes/chatRoutes");
+const conversationRoutes = require("./routes/conversationRoutes");
 
 const app = express();
 
@@ -86,6 +87,7 @@ app.get("/api/v1/health", (req, res) => {
 app.use("/api/users", userRoutes);
 app.use("/api/friends", friendRoutes);
 app.use("/api/chats", chatRoutes);
+app.use("/api/conversations", conversationRoutes);
 
 // =======================
 // 404 Handler

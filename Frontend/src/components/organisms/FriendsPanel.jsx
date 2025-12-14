@@ -24,6 +24,7 @@ import {
   getPendingRequests,
   respondToFriendRequest,
 } from "@/api/friends";
+import { createConversation } from "@/api/conversation";
 
 export default function FriendsPanel() {
   const [search, setSearch] = useState("");
@@ -118,15 +119,26 @@ export default function FriendsPanel() {
     respondRequestMutate({ id, action });
   }
 
-  // FriendsPanel.jsx
-
-  const handleOpenChat = (friend) => {
+  const handleOpenChat = async (friend) => {
     if (friend.conversationId) {
       navigate(`/chat/${friend.conversationId}`);
-    } else {
-      navigate(`/chat/new/${friend._id}`);
+      return;
     }
+
+    try {
+      const token = await getToken();
+
+      const response = await createConversation({
+        friendId: friend._id,
+        token,
+      });
+
+      if (response.isSuccess && response.conversationId) {
+        navigate(`/chat/${response.conversationId}`);
+      }
+    } catch (error) {}
   };
+
   const filteredFriends = friends.filter((friend) => {
     const q = search.toLowerCase();
     return (

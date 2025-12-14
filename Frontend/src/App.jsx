@@ -14,7 +14,7 @@ import { getMyProfile } from "./api/users";
 function App() {
   const { getToken } = useAuth();
 
-  const { data: profile } = useQuery({
+  const {} = useQuery({
     queryKey: ["myProfile"],
     queryFn: async () => {
       const token = await getToken();
