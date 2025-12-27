@@ -43,9 +43,8 @@ const socketServer = (server) => {
 
     socket.on("join_chat", async ({ chatId, userId }) => {
       socket.userId = userId;
-
-      socket.join(chatId); // 🔥 FIRST
       await setInChat(userId, chatId);
+      socket.join(chatId);
 
       // 🔥 MARK DELIVERED → READ
       const unreadMessages = await Message.find({
@@ -75,6 +74,14 @@ const socketServer = (server) => {
 
       socket.leave(chatId);
       await setOnlineFromChat(userId);
+    });
+
+    socket.on("typing_start", (chatId) => {
+      socket.to(chatId).emit("user_typing_start");
+    });
+
+    socket.on("typing_stop", (chatId) => {
+      socket.to(chatId).emit("user_typing_stop");
     });
 
     socket.on("disconnect", async () => {
