@@ -16,6 +16,11 @@ const conversationSchema = new mongoose.Schema(
       default: "private",
       required: true,
     },
+    unreadCount: {
+      type: Map,
+      of: Number,
+      default: {},
+    },
 
     lastMessage: {
       type: mongoose.Schema.Types.ObjectId,

@@ -1,24 +1,28 @@
+// =======================
+// Imports – React & Router
+// =======================
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+
+// =======================
+// Imports – React Query
+// =======================
 import {
   useInfiniteQuery,
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
+
+// =======================
+// Imports – Auth & Realtime
+// =======================
 import { useAuth } from "@clerk/clerk-react";
 import socket from "@/socket";
 import { getMessages, sendMessage } from "@/api/chat";
 
-/* =========================
-   Helpers
-========================= */
-const formatLastSeen = (date) =>
-  new Date(date).toLocaleString("en-US", {
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
+// =======================
+// Message Status Priority
+// =======================
 const statusRank = {
   sending: 0,
   sent: 1,
@@ -26,48 +30,50 @@ const statusRank = {
   read: 3,
 };
 
-/* =========================================================
-   Chat Detail Hook
-========================================================= */
+// =======================
+// Chat Detail Hook
+// =======================
 export function useChatDetail() {
+  // =======================
+  // Route Params
+  // =======================
   const { chatId } = useParams();
 
-  /* =========================
-     Local State
-  ========================= */
+  // =======================
+  // Local State
+  // =======================
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
 
-  /* =========================
-     Refs
-  ========================= */
+  // =======================
+  // Refs
+  // =======================
   const messagesEndRef = useRef(null);
   const topRef = useRef(null);
 
-  /* =========================
-     Auth & Query
-  ========================= */
+  // =======================
+  // Auth & Query Setup
+  // =======================
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
+
   const profile = queryClient.getQueryData(["myProfile"]);
   const userId = profile?.user?._id;
 
-  /* =====================================================
-     🔥 HARD RESET cache on chat switch (CRITICAL)
-  ===================================================== */
+  // =======================
+  // Reset State on Chat Change
+  // =======================
   useEffect(() => {
     if (!chatId) return;
 
-    queryClient.removeQueries({
-      queryKey: ["messages", chatId],
-      exact: true,
-    });
-  }, [chatId]);
+    setMessage("");
+    socket.emit("typing_stop", { chatId, userId });
+  }, [chatId, userId]);
 
-  /* =========================
-     Messages (Infinite Query)
-  ========================= */
-  const { data, fetchNextPage, hasNextPage } = useInfiniteQuery({
+  // =======================
+  // Fetch Messages (Paginated)
+  // =======================
+  const { data } = useInfiniteQuery({
     queryKey: ["messages", chatId],
     enabled: !!chatId,
     queryFn: async ({ pageParam }) => {
@@ -79,33 +85,29 @@ export function useChatDetail() {
       });
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    staleTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: false,
-    cacheTime: 2 * 60 * 1000,
   });
 
-  /* =========================
-     Flatten Messages
-  ========================= */
+  // =======================
+  // Normalize & Sort Messages
+  // =======================
   const messages =
     data?.pages
-      ?.flatMap((page) => page.messages)
+      ?.flatMap((p) => p.messages)
       .sort(
         (a, b) =>
           new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       ) || [];
 
-  /* =========================
-     Auto Scroll
-  ========================= */
+  // =======================
+  // Auto Scroll to Bottom
+  // =======================
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  /* =====================================================
-     🔥 JOIN / LEAVE CHAT (SEEN LOGIC)
-  ===================================================== */
+  // =======================
+  // Socket: Chat Join / Leave
+  // =======================
   useEffect(() => {
     if (!chatId || !userId) return;
 
@@ -116,14 +118,18 @@ export function useChatDetail() {
     };
   }, [chatId, userId]);
 
-  /* =========================
-     Socket: Receive Message
-  ========================= */
+  // =======================
+  // Socket Listeners (Merged)
+  // - receive_message
+  // - message_status_update
+  // - typing indicators
+  // =======================
   useEffect(() => {
     if (!chatId) return;
 
+    // 🔹 Receive new or optimistic-confirmed messages
     const handleReceiveMessage = (data) => {
-      if (data.conversationId !== chatId) return; // 🔥 isolate chat
+      if (data.conversationId !== chatId) return;
 
       queryClient.setQueryData(["messages", chatId], (old) => {
         if (!old) return old;
@@ -149,30 +155,14 @@ export function useChatDetail() {
         }));
 
         if (!replaced) {
-          const last = pages.length - 1;
-          pages[last] = {
-            ...pages[last],
-            messages: [...pages[last].messages, data],
-          };
+          pages[pages.length - 1].messages.push(data);
         }
 
         return { ...old, pages };
       });
     };
 
-    socket.on("receive_message", handleReceiveMessage);
-
-    return () => {
-      socket.off("receive_message", handleReceiveMessage);
-    };
-  }, [chatId]);
-
-  /* =========================
-     Socket: Status Updates
-  ========================= */
-  useEffect(() => {
-    if (!chatId) return;
-
+    // 🔹 Update delivery / read status
     const handleStatusUpdate = ({ messageIds, status }) => {
       queryClient.setQueryData(["messages", chatId], (old) => {
         if (!old) return old;
@@ -197,29 +187,50 @@ export function useChatDetail() {
       });
     };
 
+    // 🔹 Typing indicators
+    const handleTypingStart = ({ userId: typingUser }) => {
+      if (typingUser !== userId) setIsTyping(true);
+    };
+
+    const handleTypingStop = ({ userId: stoppedUser }) => {
+      if (stoppedUser !== userId) setIsTyping(false);
+    };
+
+    // =======================
+    // Register Socket Events
+    // =======================
+    socket.on("receive_message", handleReceiveMessage);
     socket.on("message_status_update", handleStatusUpdate);
+    socket.on("user_typing_start", handleTypingStart);
+    socket.on("user_typing_stop", handleTypingStop);
 
+    // =======================
+    // Cleanup
+    // =======================
     return () => {
+      socket.off("receive_message", handleReceiveMessage);
       socket.off("message_status_update", handleStatusUpdate);
+      socket.off("user_typing_start", handleTypingStart);
+      socket.off("user_typing_stop", handleTypingStop);
     };
-  }, [chatId, userId]);
+  }, [chatId, userId, queryClient]);
 
-  /* =========================
-     Typing Indicator
-  ========================= */
-  useEffect(() => {
-    socket.on("user_typing_start", () => setIsTyping(true));
-    socket.on("user_typing_stop", () => setIsTyping(false));
+  // =======================
+  // Emit Typing Events
+  // =======================
+  const handleTyping = (value) => {
+    if (!chatId) return;
 
-    return () => {
-      socket.off("user_typing_start");
-      socket.off("user_typing_stop");
-    };
-  }, []);
+    if (value.trim().length > 0) {
+      socket.emit("typing_start", { chatId, userId });
+    } else {
+      socket.emit("typing_stop", { chatId, userId });
+    }
+  };
 
-  /* =========================
-     Send Message (Optimistic)
-  ========================= */
+  // =======================
+  // Send Message Mutation
+  // =======================
   const sendMessageMutation = useMutation({
     mutationFn: async ({ content, media, clientId }) => {
       const token = await getToken();
@@ -231,70 +242,39 @@ export function useChatDetail() {
         clientId,
       });
     },
-
-    onMutate: async ({ content, media, clientId }) => {
-      await queryClient.cancelQueries(["messages", chatId]);
-
-      const optimisticMessage = {
-        _id: clientId,
-        clientId,
-        content,
-        media,
-        timestamp: new Date().toISOString(),
-        sender: { _id: userId },
-        status: "sending",
-      };
-
-      queryClient.setQueryData(["messages", chatId], (old) => {
-        if (!old) return old;
-
-        const pages = [...old.pages];
-        const last = pages.length - 1;
-
-        pages[last] = {
-          ...pages[last],
-          messages: [...pages[last].messages, optimisticMessage],
-        };
-
-        return { ...old, pages };
-      });
-
-      return { clientId };
-    },
-
-    onError: (_e, _v, ctx) => {
-      queryClient.setQueryData(["messages", chatId], (old) => {
-        if (!old) return old;
-
-        return {
-          ...old,
-          pages: old.pages.map((page) => ({
-            ...page,
-            messages: page.messages.map((m) =>
-              m.clientId === ctx.clientId ? { ...m, status: "failed" } : m
-            ),
-          })),
-        };
-      });
-    },
   });
 
-  /* =========================
-     Handlers
-  ========================= */
-  const handleTyping = (value) => {
-    if (value.trim().length > 0) {
-      socket.emit("typing_start", chatId);
-    } else {
-      socket.emit("typing_stop", chatId);
-    }
-  };
-
+  // =======================
+  // Handle Send (Optimistic UI)
+  // =======================
   const handleSend = (mediaFiles = []) => {
     if (!message.trim() && mediaFiles.length === 0) return;
 
+    socket.emit("typing_stop", { chatId, userId });
+
     const clientId = `client-${Date.now()}`;
-    socket.emit("typing_stop", chatId);
+
+    const optimisticMessage = {
+      _id: clientId,
+      clientId,
+      content: message,
+      sender: { _id: userId },
+      status: "sending",
+      timestamp: new Date().toISOString(),
+    };
+
+    queryClient.setQueryData(["messages", chatId], (old) => {
+      if (!old) return old;
+
+      return {
+        ...old,
+        pages: old.pages.map((p, i) =>
+          i === old.pages.length - 1
+            ? { ...p, messages: [...p.messages, optimisticMessage] }
+            : p
+        ),
+      };
+    });
 
     sendMessageMutation.mutate({
       content: message,
@@ -305,24 +285,19 @@ export function useChatDetail() {
     setMessage("");
   };
 
-  /* =========================
-     Expose Hook API
-  ========================= */
+  // =======================
+  // Exposed API
+  // =======================
   return {
     chatId,
     userId,
-
     message,
     setMessage,
     isTyping,
-
     messages,
     messagesEndRef,
     topRef,
-
     handleTyping,
     handleSend,
-
-    formatLastSeen,
   };
 }

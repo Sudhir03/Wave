@@ -25,6 +25,7 @@ import { VoiceMessageSender } from "@/components/molecules/VoiceMessageSender";
 import { ChatSearch } from "@/components/molecules/ChatSearch";
 import { MoreOptionsPopover } from "@/components/molecules/MoreOptionsPopover";
 import { CallPopover } from "@/components/molecules/CallPopover";
+import { formatLastSeen } from "@/lib/utils";
 
 /* =========================
    Icons
@@ -37,47 +38,14 @@ import { BellOff, Pin, PinOff, Send, UserX } from "lucide-react";
 import socket from "@/socket";
 import { MessageStatus } from "../molecules/MessageStatus";
 import { useOutletContext } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function ChatDetail() {
-  const chat = {
-    _id: 1,
-    name: "Alice",
-    picture: "/alice.png",
-    isOnline: true,
-    lastSeen: new Date(),
-  };
-
+  /* =========================
+     GET REAL CHAT DATA
+  ========================= */
   const {
-    chatId,
-    userId,
-
-    // state
-    message,
-    setMessage,
-    isTyping,
-    isGalleryOpen,
-    setIsGalleryOpen,
-    galleryMedia,
-    galleryStartIndex,
-    activeMediaId,
-    setActiveMediaId,
-
-    // refs
-    messagesEndRef,
-    topRef,
-
-    // data
-    messages,
-
-    // handlers
-    handleSend,
-    handleTyping,
-    handleOpenGallery,
-
-    formatLastSeen,
-  } = useChatDetail();
-
-  const {
+    activeChat,
     pinnedUsers,
     addPin,
     removePin,
@@ -87,6 +55,42 @@ export default function ChatDetail() {
     toggleBlock,
   } = useOutletContext();
 
+  const queryClient = useQueryClient();
+  const conversations =
+    queryClient
+      .getQueryData(["conversations"])
+      ?.pages.flatMap((p) => p.conversations) || [];
+
+  const liveChat = conversations.find(
+    (c) => c.conversationId === activeChat?.conversationId
+  );
+
+  const chat = liveChat?.partner || activeChat?.partner;
+
+  const {
+    chatId,
+    userId,
+
+    message,
+    setMessage,
+    isTyping,
+    isGalleryOpen,
+    setIsGalleryOpen,
+    galleryMedia,
+    galleryStartIndex,
+
+    messagesEndRef,
+    topRef,
+
+    messages,
+
+    handleSend,
+    handleTyping,
+    handleOpenGallery,
+  } = useChatDetail();
+
+  if (!chat) return null;
+
   const formatTime = (date) =>
     new Date(date).toLocaleTimeString([], {
       hour: "2-digit",
@@ -95,254 +99,147 @@ export default function ChatDetail() {
 
   return (
     <div className="h-full flex flex-col pb-1">
-      {/* Header */}
+      {/* ================= HEADER ================= */}
       <div className="flex items-center justify-between border-b-2 border-border p-2.5">
         <div className="flex items-center gap-2">
           <Avatar className="w-12 h-12">
-            <AvatarImage src={chat?.picture} alt={chat?.name} />
+            <AvatarImage src={chat.profileImageUrl} alt={chat.fullName} />
             <AvatarFallback className="bg-linear-to-r from-fuchsia-500 to-purple-600 text-white font-medium">
-              {chat?.name.charAt(0)}
+              {chat.fullName.charAt(0)}
             </AvatarFallback>
           </Avatar>
+
           <div className="flex flex-col leading-tight">
             <span className="font-semibold text-foreground max-w-48 truncate">
-              {chat?.name}
+              {chat.fullName}
             </span>
+
             <span className="text-sm text-secondary">
               {isTyping ? (
                 <span className="italic text-primary">typing...</span>
-              ) : chat?.isOnline ? (
+              ) : chat.isOnline ? (
                 "Online"
               ) : (
-                `Last seen ${formatLastSeen(chat?.lastSeen)}`
+                `Last seen ${formatLastSeen(chat.lastSeen)}`
               )}
             </span>
           </div>
         </div>
+
         <div className="flex items-center text-foreground">
           <ChatSearch messages={messages} />
-
           <CallPopover type="audio" />
-
           <CallPopover type="video" />
 
           <MoreOptionsPopover
             options={[
               {
-                label: pinnedUsers.some((u) => u.id === chat._id)
+                label: pinnedUsers.some(
+                  (p) => p.conversationId === activeChat.conversationId
+                )
                   ? "Unpin"
                   : "Pin",
                 icon: {
-                  component: pinnedUsers.some((u) => u.id === chat._id)
+                  component: pinnedUsers.some(
+                    (p) => p.conversationId === activeChat.conversationId
+                  )
                     ? PinOff
                     : Pin,
                 },
                 onClick: () => {
-                  if (pinnedUsers.some((u) => u.id === chat._id))
-                    removePin(chat._id);
-                  else
-                    addPin({
-                      id: chat._id,
-                      name: chat.name,
-                      picture: chat.picture,
-                    });
+                  if (
+                    pinnedUsers.some(
+                      (p) => p.conversationId === activeChat.conversationId
+                    )
+                  ) {
+                    removePin(activeChat.conversationId);
+                  } else {
+                    addPin(activeChat);
+                  }
                 },
               },
               {
-                label: mutedUsers.includes(chat._id) ? "Unmute" : "Mute",
+                label: mutedUsers.includes(activeChat.conversationId)
+                  ? "Unmute"
+                  : "Mute",
                 icon: { component: BellOff },
-                onClick: () => toggleMute(chat),
+                onClick: () => toggleMute(activeChat),
               },
               {
-                label: blockedUsers.includes(chat._id) ? "Unblock" : "Block",
+                label: blockedUsers.includes(activeChat.conversationId)
+                  ? "Unblock"
+                  : "Block",
                 icon: { component: UserX, props: { color: "red" } },
-                onClick: () => toggleBlock(chat),
+                onClick: () => toggleBlock(activeChat),
               },
             ]}
           />
         </div>
       </div>
 
-      {/* Messages */}
+      {/* ================= MESSAGES ================= */}
       <div className="flex-1 bg-background overflow-y-auto p-4 space-y-2 custom-scrollbar">
         <div ref={topRef} />
-        {messages.map((msg, i) => {
-          const isLastInMinute =
-            !messages[i + 1] ||
-            formatTime(messages[i + 1].timestamp) !== formatTime(msg.timestamp);
 
-          return (
-            <div
-              key={i}
-              id={`message-${msg._id}`}
-              className={`flex flex-col ${
-                msg.sender._id === userId ? "items-end" : "items-start"
-              } space-y-1`}
-            >
-              {/* Message text */}
-              {msg?.content && (
-                <div
-                  className={`max-w-xs px-3 py-2 rounded-lg ${
-                    msg.sender._id === userId
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-foreground"
-                  }`}
-                >
-                  {msg.content}
-                </div>
-              )}
-
-              {/* Media */}
-              {msg.media && msg.media.length > 0 && (
-                <>
-                  {/* Images + Videos (grid style) */}
-                  <div className="mt-1 flex gap-2 flex-wrap">
-                    {msg.media
-                      .filter((m) => m.type === "image" || m.type === "video")
-                      .slice(0, 5)
-                      .map((m, idx, arr) => {
-                        const remaining =
-                          msg.media.filter(
-                            (x) => x.type === "image" || x.type === "video"
-                          ).length - arr.length;
-
-                        if (m.type === "image") {
-                          return (
-                            <ImageAttachment
-                              key={idx}
-                              url={m.url}
-                              onClick={() => handleOpenGallery(msg.media, idx)}
-                              showRemaining={
-                                idx === arr.length - 1 && remaining > 0
-                              }
-                              remaining={remaining}
-                            />
-                          );
-                        }
-
-                        if (m.type === "video") {
-                          return (
-                            <VideoAttachment
-                              key={idx}
-                              poster={m.poster}
-                              onClick={() => handleOpenGallery(msg.media, idx)}
-                              showRemaining={
-                                idx === arr.length - 1 && remaining > 0
-                              }
-                              remaining={remaining}
-                            />
-                          );
-                        }
-
-                        return null;
-                      })}
-                  </div>
-
-                  {/* Docs / Audio / Voice (list style) */}
-                  <div className="mt-2 flex flex-col gap-2">
-                    {msg.media
-                      .filter(
-                        (m) =>
-                          m.type === "document" ||
-                          m.type === "audio" ||
-                          m.type === "voice"
-                      )
-                      .map((m, idx) => {
-                        if (m.type === "document") {
-                          console.log(m);
-
-                          return (
-                            <DocumentAttachment
-                              key={idx}
-                              fileName={m.fileName}
-                              fileSize={m.fileSize}
-                              url={m.url}
-                            />
-                          );
-                        }
-
-                        if (m.type === "audio") {
-                          console.log(m);
-
-                          return (
-                            <AudioPlayer
-                              key={idx}
-                              fileName={m.fileName}
-                              fileSize={m.fileSize}
-                              audioUrl={m.url}
-                              isActive={
-                                activeMediaId === `audio-${msg._id}-${idx}`
-                              }
-                              onPlay={() =>
-                                setActiveMediaId(`audio-${msg._id}-${idx}`)
-                              }
-                              onMenuClick={() =>
-                                console.log("Audio menu clicked")
-                              }
-                            />
-                          );
-                        }
-
-                        if (m.type === "voice") {
-                          return <VoicePlayer key={idx} audioSrc={m.url} />;
-                        }
-
-                        return null;
-                      })}
-                  </div>
-                </>
-              )}
-
-              {/* Timestamp */}
-
+        {messages.map((msg, i) => (
+          <div
+            key={msg._id}
+            className={`flex flex-col ${
+              msg.sender._id === userId ? "items-end" : "items-start"
+            } space-y-1`}
+          >
+            {msg.content && (
               <div
-                className={`flex items-center gap-1 mt-1 ${
-                  msg.sender._id === userId ? "justify-end" : "justify-start"
+                className={`max-w-xs px-3 py-2 rounded-lg ${
+                  msg.sender._id === userId
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-foreground"
                 }`}
               >
-                <span className="text-xs text-muted-foreground">
-                  {formatTime(msg.timestamp)}
-                </span>
-
-                {msg.sender._id === userId && (
-                  <MessageStatus status={msg.status} />
-                )}
+                {msg.content}
               </div>
+            )}
+
+            <div
+              className={`flex items-center gap-1 ${
+                msg.sender._id === userId ? "justify-end" : "justify-start"
+              }`}
+            >
+              <span className="text-xs text-muted-foreground">
+                {formatTime(msg.timestamp)}
+              </span>
+              {msg.sender._id === userId && (
+                <MessageStatus status={msg.status} />
+              )}
             </div>
-          );
-        })}
+          </div>
+        ))}
+
         <div ref={messagesEndRef} />
-        {/* Spacer element at the bottom to scroll into view */}
       </div>
 
-      {/* Bottom panel */}
+      {/* ================= INPUT ================= */}
       <div className="p-2 flex items-center gap-2">
-        <MediaPickerPopover onSelect={(mediaFiles) => handleSend(mediaFiles)} />
+        <MediaPickerPopover onSelect={(files) => handleSend(files)} />
         <EmojiPopover onSelect={(emoji) => setMessage(message + emoji)} />
-        <VoiceMessageSender
-          onVoiceSend={(mediaItem) => handleSend([mediaItem])}
-        />
+        <VoiceMessageSender onVoiceSend={(m) => handleSend([m])} />
+
         <Input
-          type="text"
           placeholder="Type a message..."
           value={message}
           onChange={(e) => {
-            const value = e.target.value;
-            setMessage(value);
-            handleTyping(value);
+            setMessage(e.target.value);
+            handleTyping(e.target.value);
           }}
-          onBlur={() => socket.emit("typing_stop", chatId)}
+          onBlur={() => socket.emit("typing_stop", { chatId, userId })}
           className="flex-1"
         />
 
-        <Button
-          onClick={() => handleSend()}
-          size="icon"
-          className="rounded-full cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90"
-        >
+        <Button onClick={() => handleSend()} size="icon">
           <Send className="w-5 h-5" />
         </Button>
       </div>
+
       {isGalleryOpen && (
         <MediaGallery
           media={galleryMedia}
