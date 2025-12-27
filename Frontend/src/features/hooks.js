@@ -18,7 +18,7 @@ import {
 // =======================
 import { useAuth } from "@clerk/clerk-react";
 import socket from "@/socket";
-import { getMessages, sendMessage } from "@/api/chat";
+import { getMessages, sendTextMessage, sendMediaMessage } from "@/api/chat";
 
 // =======================
 // Message Status Priority
@@ -30,9 +30,8 @@ const statusRank = {
   read: 3,
 };
 
-// =======================
-// Chat Detail Hook
-// =======================
+/* =========================================================
+   Hook
 export function useChatDetail() {
   // =======================
   // Route Params
@@ -73,6 +72,17 @@ export function useChatDetail() {
   // =======================
   // Fetch Messages (Paginated)
   // =======================
+  /* =========================
+     Reset cache on chat switch
+  ========================= */
+  useEffect(() => {
+    if (!chatId) return;
+    queryClient.removeQueries({ queryKey: ["messages", chatId], exact: true });
+  }, [chatId]);
+
+  /* =========================
+     Messages
+  ========================= */
   const { data } = useInfiniteQuery({
     queryKey: ["messages", chatId],
     enabled: !!chatId,
@@ -105,17 +115,14 @@ export function useChatDetail() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // =======================
-  // Socket: Chat Join / Leave
-  // =======================
+  /* =========================
+     Join / Leave chat
+  ========================= */
   useEffect(() => {
     if (!chatId || !userId) return;
 
     socket.emit("join_chat", { chatId, userId });
-
-    return () => {
-      socket.emit("leave_chat", { chatId, userId });
-    };
+    return () => socket.emit("leave_chat", { chatId, userId });
   }, [chatId, userId]);
 
   // =======================
@@ -124,6 +131,9 @@ export function useChatDetail() {
   // - message_status_update
   // - typing indicators
   // =======================
+  /* =========================
+     Receive message
+  ========================= */
   useEffect(() => {
     if (!chatId) return;
 
@@ -276,18 +286,26 @@ export function useChatDetail() {
       };
     });
 
-    sendMessageMutation.mutate({
-      content: message,
-      media: mediaFiles,
-      clientId,
-    });
+  const handleSendMedia = (mediaItems) => {
+    if (!mediaItems?.length) return;
 
-    setMessage("");
+    const clientId = `m-${Date.now()}`;
+
+    sendMediaMutation.mutate({
+      clientId,
+      files: mediaItems.map((m) => m.file),
+    });
   };
 
-  // =======================
-  // Exposed API
-  // =======================
+  const handleOpenGallery = (media, index) => {
+    setGalleryMedia(media);
+    setGalleryStartIndex(index);
+    setIsGalleryOpen(true);
+  };
+
+  /* =========================
+     Expose API
+  ========================= */
   return {
     chatId,
     userId,
@@ -297,7 +315,20 @@ export function useChatDetail() {
     messages,
     messagesEndRef,
     topRef,
+
+    // gallery
+    isGalleryOpen,
+    setIsGalleryOpen,
+    galleryMedia,
+    galleryStartIndex,
+    activeMediaId,
+    setActiveMediaId,
+
     handleTyping,
-    handleSend,
+    handleSendText,
+    handleSendMedia,
+    handleOpenGallery,
+
+    formatLastSeen,
   };
 }

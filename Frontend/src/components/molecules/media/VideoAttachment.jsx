@@ -1,25 +1,48 @@
-import { Play } from "lucide-react";
+import { Play, Upload } from "lucide-react";
 
-export function VideoAttachment({ poster, onClick, showRemaining, remaining }) {
+export function VideoAttachment({
+  thumbnail,
+  isUploading,
+  onClick,
+  showRemaining,
+  remaining,
+}) {
   return (
     <div
-      className="relative w-16 h-16 rounded overflow-hidden flex items-center justify-center
-        bg-[theme('colors.bg')] dark:bg-[theme('colors.bg-dark')] cursor-pointer"
       onClick={onClick}
+      className="relative w-16 h-16 rounded overflow-hidden
+        flex items-center justify-center cursor-pointer
+        bg-black"
     >
-      <img
-        src={poster}
-        alt="Video thumbnail"
-        className="w-full h-full object-cover rounded"
-      />
-      <div className="absolute inset-0 flex items-center justify-center">
-        <Play className="w-5 h-5 text-white opacity-80 pointer-events-none" />
-      </div>
+      {/* Thumbnail ONLY when NOT uploading */}
+      {!isUploading && thumbnail && (
+        <img
+          src={thumbnail}
+          alt="Video thumbnail"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      )}
 
+      {/* Uploading state → ignore thumbnail completely */}
+      {isUploading && (
+        <div
+          className="absolute inset-0 flex items-center justify-center
+          bg-black"
+        >
+          <Upload className="w-5 h-5 text-white animate-pulse" />
+        </div>
+      )}
+
+      {/* Play icon AFTER upload */}
+      {!isUploading && thumbnail && (
+        <Play className="absolute w-5 h-5 text-white opacity-80 pointer-events-none" />
+      )}
+
+      {/* Remaining count */}
       {showRemaining && remaining > 0 && (
         <div
-          className="absolute inset-0 flex items-center justify-center rounded
-            bg-muted text-muted-foreground text-sm font-medium cursor-pointer"
+          className="absolute inset-0 flex items-center justify-center
+          bg-black/70 text-white text-sm font-medium"
         >
           +{remaining}
         </div>

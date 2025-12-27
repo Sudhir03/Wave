@@ -79,6 +79,14 @@ function App() {
   // =======================
   // App Render
   // =======================
+  useEffect(() => {
+    const showToken = async () => {
+      const token = await getToken({ template: "backend-api" });
+      console.log("JWT Token:", token);
+    };
+    showToken();
+  }, [getToken]);
+
   return (
     <>
       {/* Render app only when authenticated */}

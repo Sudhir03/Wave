@@ -1,12 +1,10 @@
 const express = require("express");
-const multer = require("multer");
 
 const userController = require("../controllers/userController");
 const { requireAuth } = require("../middlewares/requireAuth");
+const upload = require("../middlewares/upload");
 
 const router = express.Router();
-
-const upload = multer({ storage: multer.memoryStorage() });
 
 router.post("/sync", userController.clerkUserSync);
 

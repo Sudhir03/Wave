@@ -147,7 +147,7 @@ export function MediaGallery({ media, initialIndex, isOpen, setIsOpen }) {
         <div className="relative flex items-center justify-center max-w-4xl w-full h-[70vh] bg-transparent rounded-md">
           {currentMedia.type === "image" && (
             <img
-              src={currentMedia.src}
+              src={currentMedia.url}
               alt="Shared Media"
               className="max-w-full max-h-[85vh] object-contain"
             />
@@ -156,7 +156,7 @@ export function MediaGallery({ media, initialIndex, isOpen, setIsOpen }) {
             <video
               key={currentMedia.id}
               ref={videoRef}
-              src={currentMedia.src}
+              src={currentMedia.url}
               muted={isMuted}
               className="max-w-full max-h-[85vh] object-contain cursor-pointer"
               onClick={togglePlay}
@@ -182,7 +182,7 @@ export function MediaGallery({ media, initialIndex, isOpen, setIsOpen }) {
               )}
             </Button>
 
-            <span className="text-white text-xs min-w-[40px]">
+            <span className="text-white text-xs min-w-10">
               {formatTime(videoRef.current?.currentTime || 0)}
             </span>
 
@@ -196,7 +196,7 @@ export function MediaGallery({ media, initialIndex, isOpen, setIsOpen }) {
               />
             </div>
 
-            <span className="text-white text-xs min-w-[40px]">
+            <span className="text-white text-xs min-w-10">
               {formatTime(videoRef.current?.duration || 0)}
             </span>
 
@@ -219,9 +219,9 @@ export function MediaGallery({ media, initialIndex, isOpen, setIsOpen }) {
         <div className="w-full max-w-4xl flex gap-2 overflow-x-auto no-scrollbar">
           {media.map((item, index) => (
             <div
-              key={item.id}
+              key={item._id}
               onClick={() => setCurrentIndex(index)}
-              className={`relative flex-shrink-0 cursor-pointer transition-all duration-200 hover:opacity-80 ${
+              className={`relative shrink-0 cursor-pointer transition-all duration-200 hover:opacity-80 ${
                 index === currentIndex ? "ring-2 ring-blue-400" : ""
               }`}
             >

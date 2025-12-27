@@ -74,18 +74,20 @@ export default function ChatDetail() {
     message,
     setMessage,
     isTyping,
+
+    messages,
+    messagesEndRef,
+    topRef,
+
+    // 🔥 gallery state
     isGalleryOpen,
     setIsGalleryOpen,
     galleryMedia,
     galleryStartIndex,
 
-    messagesEndRef,
-    topRef,
-
-    messages,
-
-    handleSend,
     handleTyping,
+    handleSendText,
+    handleSendMedia,
     handleOpenGallery,
   } = useChatDetail();
 
