@@ -1,102 +1,107 @@
 const { Server } = require("socket.io");
+const {
+  setOnline,
+  setInChat,
+  setOnlineFromChat,
+  handleDisconnect,
+} = require("../redis/presence");
+
 const Message = require("../models/messageModel");
+const logger = require("../utils/logger");
 
 let io;
 
 const socketServer = (server) => {
   io = new Server(server, {
     cors: {
-      origin: process.env.SERVER_URL,
-      methods: ["GET", "POST"],
+      origin: "*",
     },
   });
 
-  io.on("connection", async (socket) => {
-    console.log("Socket connected:", socket.id);
+  io.on("connection", (socket) => {
+    logger.info(`🔗 Socket connected: ${socket.id}`);
 
-    // 🔑 USER ID FROM FRONTEND
-    const userId = socket.handshake.auth?.userId;
-    if (userId) {
-      // ✅ USER PERSONAL ROOM (for future use)
-      socket.join(userId.toString());
+    socket.on("register_user", async ({ userId }) => {
+      socket.userId = userId;
+      await setOnline(userId, socket.id);
 
-      // =====================================================
-      // 🔥 DELIVERED LOGIC (ON APP OPEN / SOCKET CONNECT)
-      // =====================================================
+      // 🔥 ADD THIS BLOCK
       const undeliveredMessages = await Message.find({
         receiver: userId,
         status: "sent",
       });
 
-      if (undeliveredMessages.length > 0) {
-        // 1️⃣ Update DB
-        await Message.updateMany(
-          { receiver: userId, status: "sent" },
-          {
-            status: "delivered",
-            deliveredAt: new Date(),
-          }
-        );
+      for (const msg of undeliveredMessages) {
+        await Message.updateOne({ _id: msg._id }, { status: "delivered" });
 
-        // 2️⃣ Notify SENDERS
-        undeliveredMessages.forEach((msg) => {
-          io.to(msg.conversationId.toString()).emit("message_delivered", {
-            conversationId: msg.conversationId,
-            messageId: msg._id,
-          });
+        socket.to(msg.conversationId.toString()).emit("message_status_update", {
+          messageIds: [msg._id],
+          status: "delivered",
         });
       }
-    }
-
-    // ===============================
-    // JOIN / LEAVE CHAT
-    // ===============================
-    socket.on("join_chat", (conversationId) => {
-      socket.join(conversationId);
     });
 
-    socket.on("leave_chat", (conversationId) => {
-      socket.leave(conversationId);
+    socket.on("join_chat", async ({ chatId, userId }) => {
+      socket.userId = userId;
+
+      socket.join(chatId); // 🔥 FIRST
+      await setInChat(userId, chatId);
+
+      // 🔥 MARK DELIVERED → READ
+      const unreadMessages = await Message.find({
+        conversationId: chatId,
+        receiver: userId,
+        status: { $ne: "read" },
+      }).select("_id");
+
+      if (unreadMessages.length > 0) {
+        const messageIds = unreadMessages.map((m) => m._id);
+
+        await Message.updateMany(
+          { _id: { $in: messageIds } },
+          { status: "read" }
+        );
+
+        // 🔔 NOTIFY SENDER
+        socket.to(chatId).emit("message_status_update", {
+          messageIds,
+          status: "read",
+        });
+      }
     });
 
-    // ===============================
-    // TYPING INDICATOR
-    // ===============================
-    socket.on("typing_start", (conversationId) => {
-      socket.to(conversationId).emit("user_typing_start");
+    socket.on("leave_chat", async ({ chatId, userId }) => {
+      socket.userId = userId;
+
+      socket.leave(chatId);
+      await setOnlineFromChat(userId);
     });
 
-    socket.on("typing_stop", (conversationId) => {
-      socket.to(conversationId).emit("user_typing_stop");
-    });
+    socket.on("disconnect", async () => {
+      if (!socket.userId) return;
 
-    // ===============================
-    // READ STATUS
-    // ===============================
-    socket.on("message_read", async ({ conversationId, messageId }) => {
-      await Message.findByIdAndUpdate(messageId, {
-        status: "read",
-        readAt: new Date(),
-      });
+      const wentOffline = await handleDisconnect(socket.userId, socket.id);
 
-      socket.to(conversationId).emit("message_read", {
-        conversationId,
-        messageId,
-      });
-    });
-
-    // ===============================
-    // DISCONNECT
-    // ===============================
-    socket.on("disconnect", () => {
-      console.log("Socket disconnected:", socket.id);
+      if (wentOffline) {
+        socket.broadcast.emit("presence_update", {
+          userId: socket.userId,
+          status: "offline",
+          lastSeen: Date.now(),
+        });
+      }
     });
   });
 };
 
+// ✅ ADD THIS
 const getIO = () => {
-  if (!io) throw new Error("Socket.io not initialized");
+  if (!io) {
+    throw new Error("Socket.io not initialized");
+  }
   return io;
 };
 
-module.exports = { socketServer, getIO };
+module.exports = {
+  socketServer,
+  getIO,
+};

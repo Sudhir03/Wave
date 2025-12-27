@@ -5,6 +5,7 @@ const User = require("../models/userModel");
 const catchAsync = require("../utils/catchAsync");
 
 const { getIO } = require("../socket/socket");
+const { getPresence } = require("../redis/presence");
 
 exports.getMyConversations = async (req, res) => {
   try {
@@ -56,7 +57,6 @@ exports.getMyConversations = async (req, res) => {
       nextCursor,
     });
   } catch (error) {
-    console.error(error);
     res.status(500).json({ message: "Failed to load conversations" });
   }
 };
@@ -204,66 +204,53 @@ exports.getUnifiedChatData = catchAsync(async (req, res) => {
 
 exports.sendMessage = catchAsync(async (req, res) => {
   const { userId } = req;
-  const { conversationId, content, media = [] } = req.body;
-
-  if (!content && media.length === 0) {
-    return res.status(400).json({
-      isSuccess: false,
-      message: "Message content or media is required.",
-    });
-  }
+  const { conversationId, content, media = [], clientId } = req.body;
 
   const conversation = await Conversation.findById(conversationId);
   if (!conversation) {
     return res.status(404).json({ message: "Conversation not found" });
   }
 
+  const receiverId = conversation.participants.find(
+    (id) => id.toString() !== userId.toString()
+  );
+
+  // 🔎 CHECK RECEIVER PRESENCE
+  const presence = await getPresence(receiverId);
+  let status = "sent";
+
   if (
-    !conversation.participants.some((id) => id.toString() === userId.toString())
+    presence?.status === "in_chat" &&
+    presence.activeChatId === conversationId.toString()
   ) {
-    return res.status(403).json({ message: "Access denied" });
+    status = "read";
+  } else if (presence?.status === "online" || presence?.status === "in_chat") {
+    status = "delivered";
   }
 
-  // 🔑 RECEIVER LOGIC
-  let receiverId = null;
-
-  if (conversation.type === "private") {
-    receiverId = conversation.participants.find(
-      (id) => id.toString() !== userId.toString()
-    );
-
-    if (!receiverId) {
-      return res.status(400).json({ message: "Receiver not found" });
-    }
-  }
-
-  // 1️⃣ CREATE MESSAGE
+  // ✅ SAVE MESSAGE WITH STATUS
   const message = await Message.create({
     conversationId,
     sender: userId,
-    receiver: receiverId, // null for group chats
+    receiver: receiverId,
     content,
     media,
-    status: "sent",
+    status,
   });
 
-  // 2️⃣ POPULATE SENDER
   const populatedMessage = await message.populate(
     "sender",
     "fullName profileImageUrl"
   );
 
-  // 3️⃣ UPDATE CONVERSATION
-  await Conversation.findByIdAndUpdate(conversationId, {
-    lastMessage: message._id,
-    updatedAt: new Date(),
+  // 🚀 EMIT MESSAGE
+  const io = getIO();
+  io.to(conversationId.toString()).emit("receive_message", {
+    ...populatedMessage.toObject(),
+    clientId,
+    status,
   });
 
-  // 4️⃣ SOCKET EMIT
-  const io = getIO();
-  io.to(conversationId.toString()).emit("receive_message", populatedMessage);
-
-  // 5️⃣ RESPONSE
   return res.status(201).json({
     isSuccess: true,
     sentMessage: populatedMessage,

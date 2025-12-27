@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const http = require("http");
 const logger = require("./utils/logger");
 const { socketServer } = require("./socket/socket");
+const redis = require("./redis/redis");
 
 dotenv.config();
 const app = require("./app");
@@ -100,6 +101,11 @@ const shutdown = async (exitCode) => {
 
     await mongoose.connection.close();
     logger.info("📴 MongoDB connection closed");
+
+    if (redis.isOpen) {
+      await redis.quit();
+      logger.info("📴 Redis connection closed");
+    }
 
     process.exit(exitCode);
   } catch (err) {
