@@ -7,10 +7,10 @@ import {
 import AppRoutes from "@/routes/AppRoutes";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMyProfile } from "./api/users";
-import socket, { attachUserToSocket } from "@/socket";
+import socket from "@/socket";
+import { useEffect } from "react";
 
 function App() {
   const { getToken } = useAuth();
@@ -25,34 +25,19 @@ function App() {
     select: (res) => res.user,
   });
 
-  // 🔥 DELIVERED STATUS HANDLER (GLOBAL)
   useEffect(() => {
     if (!user?._id) return;
 
-    attachUserToSocket(user._id);
+    socket.connect();
 
-    socket.on("message_delivered", ({ conversationId, messageId }) => {
-      queryClient.setQueryData(["messages", conversationId], (old) => {
-        if (!old) return old;
-
-        return {
-          ...old,
-          pages: old.pages.map((page) => ({
-            ...page,
-            messages: page.messages.map((m) =>
-              m._id === messageId && m.status === "sent"
-                ? { ...m, status: "delivered" }
-                : m
-            ),
-          })),
-        };
-      });
+    socket.emit("register_user", {
+      userId: user._id,
     });
 
     return () => {
-      socket.off("message_delivered");
+      socket.disconnect(); // 👈 yahi se offline trigger hoga
     };
-  }, [user, queryClient]);
+  }, [user?._id]);
 
   return (
     <>
