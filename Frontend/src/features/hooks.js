@@ -7,7 +7,7 @@ import {
 } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-react";
 import socket from "@/socket";
-import { getMessages, sendMessage } from "@/api/chat";
+import { getMessages, sendTextMessage, sendMediaMessage } from "@/api/chat";
 
 /* =========================
    Helpers
@@ -27,7 +27,7 @@ const statusRank = {
 };
 
 /* =========================================================
-   Chat Detail Hook
+   Hook
 ========================================================= */
 export function useChatDetail() {
   const { chatId } = useParams();
@@ -37,6 +37,12 @@ export function useChatDetail() {
   ========================= */
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+
+  // 🔥 Gallery state (RESTORED)
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [galleryMedia, setGalleryMedia] = useState([]);
+  const [galleryStartIndex, setGalleryStartIndex] = useState(0);
+  const [activeMediaId, setActiveMediaId] = useState(null);
 
   /* =========================
      Refs
@@ -52,22 +58,18 @@ export function useChatDetail() {
   const profile = queryClient.getQueryData(["myProfile"]);
   const userId = profile?.user?._id;
 
-  /* =====================================================
-     🔥 HARD RESET cache on chat switch (CRITICAL)
-  ===================================================== */
+  /* =========================
+     Reset cache on chat switch
+  ========================= */
   useEffect(() => {
     if (!chatId) return;
-
-    queryClient.removeQueries({
-      queryKey: ["messages", chatId],
-      exact: true,
-    });
+    queryClient.removeQueries({ queryKey: ["messages", chatId], exact: true });
   }, [chatId]);
 
   /* =========================
-     Messages (Infinite Query)
+     Messages
   ========================= */
-  const { data, fetchNextPage, hasNextPage } = useInfiniteQuery({
+  const { data } = useInfiniteQuery({
     queryKey: ["messages", chatId],
     enabled: !!chatId,
     queryFn: async ({ pageParam }) => {
@@ -79,51 +81,41 @@ export function useChatDetail() {
       });
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    staleTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: false,
-    cacheTime: 2 * 60 * 1000,
   });
 
-  /* =========================
-     Flatten Messages
-  ========================= */
   const messages =
     data?.pages
-      ?.flatMap((page) => page.messages)
+      ?.flatMap((p) => p.messages)
       .sort(
         (a, b) =>
           new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       ) || [];
 
   /* =========================
-     Auto Scroll
+     Auto scroll
   ========================= */
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  /* =====================================================
-     🔥 JOIN / LEAVE CHAT (SEEN LOGIC)
-  ===================================================== */
+  /* =========================
+     Join / Leave chat
+  ========================= */
   useEffect(() => {
     if (!chatId || !userId) return;
 
     socket.emit("join_chat", { chatId, userId });
-
-    return () => {
-      socket.emit("leave_chat", { chatId, userId });
-    };
+    return () => socket.emit("leave_chat", { chatId, userId });
   }, [chatId, userId]);
 
   /* =========================
-     Socket: Receive Message
+     Receive message
   ========================= */
   useEffect(() => {
     if (!chatId) return;
 
     const handleReceiveMessage = (data) => {
-      if (data.conversationId !== chatId) return; // 🔥 isolate chat
+      if (data.conversationId !== chatId) return;
 
       queryClient.setQueryData(["messages", chatId], (old) => {
         if (!old) return old;
@@ -161,51 +153,11 @@ export function useChatDetail() {
     };
 
     socket.on("receive_message", handleReceiveMessage);
-
-    return () => {
-      socket.off("receive_message", handleReceiveMessage);
-    };
+    return () => socket.off("receive_message", handleReceiveMessage);
   }, [chatId]);
 
   /* =========================
-     Socket: Status Updates
-  ========================= */
-  useEffect(() => {
-    if (!chatId) return;
-
-    const handleStatusUpdate = ({ messageIds, status }) => {
-      queryClient.setQueryData(["messages", chatId], (old) => {
-        if (!old) return old;
-
-        return {
-          ...old,
-          pages: old.pages.map((page) => ({
-            ...page,
-            messages: page.messages.map((m) =>
-              messageIds.includes(m._id) && m.sender._id === userId
-                ? {
-                    ...m,
-                    status:
-                      statusRank[status] > statusRank[m.status]
-                        ? status
-                        : m.status,
-                  }
-                : m
-            ),
-          })),
-        };
-      });
-    };
-
-    socket.on("message_status_update", handleStatusUpdate);
-
-    return () => {
-      socket.off("message_status_update", handleStatusUpdate);
-    };
-  }, [chatId, userId]);
-
-  /* =========================
-     Typing Indicator
+     Typing indicator
   ========================= */
   useEffect(() => {
     socket.on("user_typing_start", () => setIsTyping(true));
@@ -218,26 +170,16 @@ export function useChatDetail() {
   }, []);
 
   /* =========================
-     Send Message (Optimistic)
+     Optimistic helper
   ========================= */
-  const sendMessageMutation = useMutation({
-    mutationFn: async ({ content, media, clientId }) => {
-      const token = await getToken();
-      return sendMessage({
-        token,
-        conversationId: chatId,
-        content,
-        media,
-        clientId,
-      });
-    },
+  const addOptimisticMessage = ({ clientId, type, content, media }) => {
+    queryClient.setQueryData(["messages", chatId], (old) => {
+      if (!old) return old;
 
-    onMutate: async ({ content, media, clientId }) => {
-      await queryClient.cancelQueries(["messages", chatId]);
-
-      const optimisticMessage = {
+      const optimistic = {
         _id: clientId,
         clientId,
+        type,
         content,
         media,
         timestamp: new Date().toISOString(),
@@ -245,36 +187,91 @@ export function useChatDetail() {
         status: "sending",
       };
 
-      queryClient.setQueryData(["messages", chatId], (old) => {
-        if (!old) return old;
+      const pages = [...old.pages];
+      const last = pages.length - 1;
+      pages[last] = {
+        ...pages[last],
+        messages: [...pages[last].messages, optimistic],
+      };
 
-        const pages = [...old.pages];
-        const last = pages.length - 1;
+      return { ...old, pages };
+    });
+  };
 
-        pages[last] = {
-          ...pages[last],
-          messages: [...pages[last].messages, optimisticMessage],
-        };
-
-        return { ...old, pages };
+  /* =========================
+     Mutations
+  ========================= */
+  const sendTextMutation = useMutation({
+    mutationFn: async ({ content, clientId }) => {
+      const token = await getToken();
+      return sendTextMessage({
+        token,
+        conversationId: chatId,
+        content,
+        clientId,
       });
+    },
+    onMutate: ({ content, clientId }) => {
+      addOptimisticMessage({
+        clientId,
+        type: "text",
+        content,
+        media: [],
+      });
+    },
+  });
 
-      return { clientId };
+  const sendMediaMutation = useMutation({
+    mutationFn: async ({ files, clientId }) => {
+      const token = await getToken();
+      return sendMediaMessage({
+        token,
+        conversationId: chatId,
+        files,
+        clientId,
+      });
     },
 
-    onError: (_e, _v, ctx) => {
-      queryClient.setQueryData(["messages", chatId], (old) => {
-        if (!old) return old;
+    onMutate: ({ files, clientId }) => {
+      const optimisticMedia = files.map((file) => {
+        const previewUrl = URL.createObjectURL(file);
+
+        let type = "document";
+        let thumbnail = null;
+        let isVoice = false; // 🔥 ADD THIS
+
+        if (file.type.startsWith("image")) {
+          type = "image";
+          thumbnail = previewUrl;
+        } else if (file.type.startsWith("video")) {
+          type = "video";
+          thumbnail = previewUrl;
+        } else if (file.type.startsWith("audio")) {
+          type = "audio";
+
+          // 🔥 IMPORTANT LOGIC
+          if (file.name.startsWith("voice-")) {
+            isVoice = true;
+          }
+        }
 
         return {
-          ...old,
-          pages: old.pages.map((page) => ({
-            ...page,
-            messages: page.messages.map((m) =>
-              m.clientId === ctx.clientId ? { ...m, status: "failed" } : m
-            ),
-          })),
+          _id: `tmp-${crypto.randomUUID()}`,
+          type,
+          isVoice, // 🔥 ADD THIS
+          url: previewUrl,
+          thumbnail,
+          fileName: file.name,
+          fileSize: file.size,
+          isOptimistic: true,
         };
+      });
+
+      addOptimisticMessage({
+        clientId,
+        type: "media",
+        content: "",
+        media: optimisticMedia,
       });
     },
   });
@@ -282,31 +279,38 @@ export function useChatDetail() {
   /* =========================
      Handlers
   ========================= */
-  const handleTyping = (value) => {
-    if (value.trim().length > 0) {
-      socket.emit("typing_start", chatId);
-    } else {
-      socket.emit("typing_stop", chatId);
-    }
+  const handleTyping = (action) => {
+    socket.emit(action, chatId);
   };
 
-  const handleSend = (mediaFiles = []) => {
-    if (!message.trim() && mediaFiles.length === 0) return;
+  const handleSendText = () => {
+    if (!message.trim()) return;
 
-    const clientId = `client-${Date.now()}`;
+    const clientId = `t-${Date.now()}`;
     socket.emit("typing_stop", chatId);
-
-    sendMessageMutation.mutate({
-      content: message,
-      media: mediaFiles,
-      clientId,
-    });
-
+    sendTextMutation.mutate({ content: message.trim(), clientId });
     setMessage("");
   };
 
+  const handleSendMedia = (mediaItems) => {
+    if (!mediaItems?.length) return;
+
+    const clientId = `m-${Date.now()}`;
+
+    sendMediaMutation.mutate({
+      clientId,
+      files: mediaItems.map((m) => m.file),
+    });
+  };
+
+  const handleOpenGallery = (media, index) => {
+    setGalleryMedia(media);
+    setGalleryStartIndex(index);
+    setIsGalleryOpen(true);
+  };
+
   /* =========================
-     Expose Hook API
+     Expose API
   ========================= */
   return {
     chatId,
@@ -320,8 +324,18 @@ export function useChatDetail() {
     messagesEndRef,
     topRef,
 
+    // gallery
+    isGalleryOpen,
+    setIsGalleryOpen,
+    galleryMedia,
+    galleryStartIndex,
+    activeMediaId,
+    setActiveMediaId,
+
     handleTyping,
-    handleSend,
+    handleSendText,
+    handleSendMedia,
+    handleOpenGallery,
 
     formatLastSeen,
   };

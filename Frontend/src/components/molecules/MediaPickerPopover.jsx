@@ -12,48 +12,51 @@ import { Paperclip, Headphones, FileTextIcon, ImageIcon } from "lucide-react";
 export function MediaPickerPopover({ onSelect }) {
   const [open, setOpen] = useState(false);
 
-  // Handles selection of multiple files (images/videos together)
+  /* =========================
+     Images + Videos
+  ========================= */
   const handleMediaFiles = (files) => {
     if (!files || files.length === 0) return;
 
-    const mediaFiles = Array.from(files).map((file, i) => ({
-      id: Date.now() + i,
-      type: file.type.startsWith("image") ? "image" : "video",
-      url: URL.createObjectURL(file),
-      poster: file.type.startsWith("image") ? null : URL.createObjectURL(file),
-      fileName: file.name,
-      fileSize: `${Math.round(file.size / 1024)} KB`,
-    }));
+    const mediaFiles = Array.from(files).map((file, i) => {
+      const isImage = file.type.startsWith("image");
+      const localUrl = URL.createObjectURL(file);
+
+      return {
+        id: Date.now() + i,
+
+        type: isImage ? "image" : "video",
+
+        file,
+        url: localUrl,
+        thumbnail: localUrl,
+
+        fileName: file.name,
+        fileSize: file.size,
+      };
+    });
 
     onSelect(mediaFiles);
     setOpen(false);
   };
 
-  // Handles audio and documents separately
+  /* =========================
+     Audio / Document
+  ========================= */
   const handleFile = (file, type) => {
     if (!file) return;
 
-    let mediaItem = null;
+    const mediaItem = {
+      id: Date.now(),
 
-    if (type === "audio") {
-      mediaItem = {
-        id: Date.now(),
-        type: "audio",
-        fileName: file.name,
-        fileSize: `${Math.round(file.size / 1024)} KB`,
-        url: URL.createObjectURL(file),
-      };
-    }
+      type,
+      file,
+      url: URL.createObjectURL(file),
+      thumbnail: null,
 
-    if (type === "document") {
-      mediaItem = {
-        id: Date.now(),
-        type: "document",
-        fileName: file.name,
-        fileSize: `${Math.round(file.size / 1024)} KB`,
-        url: URL.createObjectURL(file),
-      };
-    }
+      fileName: file.name,
+      fileSize: file.size,
+    };
 
     onSelect([mediaItem]);
     setOpen(false);

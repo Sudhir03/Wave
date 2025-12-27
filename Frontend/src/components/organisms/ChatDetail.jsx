@@ -51,10 +51,15 @@ export default function ChatDetail() {
     chatId,
     userId,
 
-    // state
     message,
     setMessage,
     isTyping,
+
+    messages,
+    messagesEndRef,
+    topRef,
+
+    // 🔥 gallery state
     isGalleryOpen,
     setIsGalleryOpen,
     galleryMedia,
@@ -62,16 +67,9 @@ export default function ChatDetail() {
     activeMediaId,
     setActiveMediaId,
 
-    // refs
-    messagesEndRef,
-    topRef,
-
-    // data
-    messages,
-
-    // handlers
-    handleSend,
     handleTyping,
+    handleSendText,
+    handleSendMedia,
     handleOpenGallery,
 
     formatLastSeen,
@@ -206,11 +204,15 @@ export default function ChatDetail() {
                             (x) => x.type === "image" || x.type === "video"
                           ).length - arr.length;
 
+                        const isUploading =
+                          m.isOptimistic && msg.status === "sending";
+
                         if (m.type === "image") {
                           return (
                             <ImageAttachment
                               key={idx}
-                              url={m.url}
+                              url={m.thumbnail}
+                              isUploading={isUploading}
                               onClick={() => handleOpenGallery(msg.media, idx)}
                               showRemaining={
                                 idx === arr.length - 1 && remaining > 0
@@ -224,7 +226,8 @@ export default function ChatDetail() {
                           return (
                             <VideoAttachment
                               key={idx}
-                              poster={m.poster}
+                              thumbnail={m.thumbnail}
+                              isUploading={isUploading}
                               onClick={() => handleOpenGallery(msg.media, idx)}
                               showRemaining={
                                 idx === arr.length - 1 && remaining > 0
@@ -242,28 +245,34 @@ export default function ChatDetail() {
                   <div className="mt-2 flex flex-col gap-2">
                     {msg.media
                       .filter(
-                        (m) =>
-                          m.type === "document" ||
-                          m.type === "audio" ||
-                          m.type === "voice"
+                        (m) => m.type === "document" || m.type === "audio"
                       )
                       .map((m, idx) => {
+                        const isUploading =
+                          m.isOptimistic && msg.status === "sending";
                         if (m.type === "document") {
-                          console.log(m);
-
                           return (
                             <DocumentAttachment
                               key={idx}
                               fileName={m.fileName}
                               fileSize={m.fileSize}
                               url={m.url}
+                              isUploading={isUploading}
                             />
                           );
                         }
 
-                        if (m.type === "audio") {
-                          console.log(m);
+                        if (m.type === "audio" && m.isVoice) {
+                          return (
+                            <VoicePlayer
+                              key={idx}
+                              audioSrc={m.url}
+                              isUploading={isUploading}
+                            />
+                          );
+                        }
 
+                        if (m.type === "audio" && !m.isVoice) {
                           return (
                             <AudioPlayer
                               key={idx}
@@ -273,18 +282,12 @@ export default function ChatDetail() {
                               isActive={
                                 activeMediaId === `audio-${msg._id}-${idx}`
                               }
+                              isUploading={isUploading}
                               onPlay={() =>
                                 setActiveMediaId(`audio-${msg._id}-${idx}`)
                               }
-                              onMenuClick={() =>
-                                console.log("Audio menu clicked")
-                              }
                             />
                           );
-                        }
-
-                        if (m.type === "voice") {
-                          return <VoicePlayer key={idx} audioSrc={m.url} />;
                         }
 
                         return null;
@@ -317,26 +320,26 @@ export default function ChatDetail() {
 
       {/* Bottom panel */}
       <div className="p-2 flex items-center gap-2">
-        <MediaPickerPopover onSelect={(mediaFiles) => handleSend(mediaFiles)} />
+        <MediaPickerPopover
+          onSelect={(mediaFiles) => handleSendMedia(mediaFiles)}
+        />
         <EmojiPopover onSelect={(emoji) => setMessage(message + emoji)} />
         <VoiceMessageSender
-          onVoiceSend={(mediaItem) => handleSend([mediaItem])}
+          onVoiceSend={(mediaItem) => handleSendMedia([mediaItem])}
         />
+
         <Input
           type="text"
           placeholder="Type a message..."
           value={message}
-          onChange={(e) => {
-            const value = e.target.value;
-            setMessage(value);
-            handleTyping(value);
-          }}
-          onBlur={() => socket.emit("typing_stop", chatId)}
+          onChange={(e) => setMessage(e.target.value)}
+          onFocus={() => handleTyping("typing_start")}
+          onBlur={() => handleTyping("typing_stop")}
           className="flex-1"
         />
 
         <Button
-          onClick={() => handleSend()}
+          onClick={handleSendText}
           size="icon"
           className="rounded-full cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90"
         >

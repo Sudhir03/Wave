@@ -1,35 +1,37 @@
 const express = require("express");
-
 const { requireAuth } = require("../middlewares/requireAuth");
-
 const chatController = require("../controllers/chatController");
+const upload = require("../middlewares/upload");
 
 const router = express.Router();
 
+/* =========================
+   Conversations
+========================= */
 router.get("/my-conversations", requireAuth, chatController.getMyConversations);
+
+/* =========================
+   Messages (pagination)
+========================= */
 router.get(
   "/:conversationId/messages",
   requireAuth,
   chatController.getMessages
 );
 
-// GET: Unified Fetch by Friend ID (New Chat)
-router.get(
-  "/by-user/:friendId",
-  requireAuth,
-  chatController.getUnifiedChatData
-);
+/* =========================
+   SEND TEXT MESSAGE
+========================= */
+router.post("/send/text", requireAuth, chatController.sendTextMessage);
 
-// GET: Unified Fetch by Conversation ID (Existing Chat)
-router.get("/:conversationId", requireAuth, chatController.getUnifiedChatData);
-
-router.post("/send", requireAuth, chatController.sendMessage);
-
-// POST: Send message in an existing chat
+/* =========================
+   SEND MEDIA MESSAGE
+========================= */
 router.post(
-  "/:conversationId/message",
+  "/send/media",
   requireAuth,
-  chatController.sendMessage
+  upload.array("files"),
+  chatController.sendMediaMessage
 );
 
 module.exports = router;

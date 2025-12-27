@@ -56,15 +56,21 @@ export function VoiceMessageSender({ onVoiceSend }) {
 
   const handleSend = () => {
     if (!mediaBlob) return;
-    const mediaItem = {
+
+    const file = new File([mediaBlob], `voice-${Date.now()}.mp3`, {
+      type: "audio/mpeg",
+    });
+
+    onVoiceSend({
       id: Date.now(),
-      type: "voice",
-      url: URL.createObjectURL(mediaBlob),
-      fileName: "Voice Message",
-      fileSize: `${Math.round(mediaBlob.size / 1024)} KB`,
-      timestamp: new Date(),
-    };
-    onVoiceSend(mediaItem);
+      type: "audio",
+      isVoice: true,
+      file,
+      url: URL.createObjectURL(file),
+      fileName: file.name,
+      fileSize: file.size,
+    });
+
     resetState();
   };
 
@@ -141,7 +147,7 @@ export function VoiceMessageSender({ onVoiceSend }) {
           )}
 
           {/* Duration */}
-          <span className="text-base sm:text-lg font-medium text-gray-800 absolute bottom-[-28px] sm:bottom-[-30px]">
+          <span className="text-base sm:text-lg font-medium text-gray-800 absolute -bottom-7 sm:bottom-[-30px]">
             {formatDuration(duration)}
           </span>
         </div>

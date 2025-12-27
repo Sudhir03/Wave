@@ -1,9 +1,6 @@
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
-/**
- * Message Schema
- */
 const MessageSchema = new Schema(
   {
     conversationId: {
@@ -37,19 +34,19 @@ const MessageSchema = new Schema(
         type: {
           type: String,
           required: true,
-          enum: ["image", "video", "document", "audio", "voice"],
+          enum: ["image", "video", "document", "audio"],
+        },
+        isVoice: {
+          type: Boolean,
+          default: false,
         },
         url: {
           type: String,
           required: true,
         },
-        fileName: {
-          type: String,
-        },
-        fileSize: {
-          type: Number,
-        },
-        poster: {
+        fileName: String,
+        fileSize: Number,
+        thumbnail: {
           type: String,
           default: null,
         },

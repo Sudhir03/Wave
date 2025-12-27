@@ -1,5 +1,8 @@
 import api from "./apiClient";
 
+/* =========================
+   Conversations
+========================= */
 export const getMyConversations = async ({ pageParam = null, token }) => {
   const res = await api.get("/chats/my-conversations", {
     params: {
@@ -14,6 +17,9 @@ export const getMyConversations = async ({ pageParam = null, token }) => {
   return res.data;
 };
 
+/* =========================
+   Messages (pagination)
+========================= */
 export const getMessages = async ({ conversationId, cursor, token }) => {
   const params = new URLSearchParams();
   params.append("limit", 20);
@@ -32,23 +38,52 @@ export const getMessages = async ({ conversationId, cursor, token }) => {
   return res.data;
 };
 
-// Fetches chat details and history using either friendId or conversationId
-export const getUnifiedChatData = async ({ id, token }) => {
-  const endpoint = `/chats/${id}`;
-
-  const res = await api.get(endpoint, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+/* =========================
+   SEND TEXT MESSAGE
+========================= */
+export const sendTextMessage = async ({
+  token,
+  conversationId,
+  content,
+  clientId,
+}) => {
+  const res = await api.post(
+    "/chats/send/text",
+    {
+      conversationId,
+      content,
+      clientId,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
 
   return res.data;
 };
 
-// Sends a message. If conversationId is missing, it creates a new conversation first.
-export const sendMessage = async (body) => {
-  const { token, ...requestBody } = body;
+/* =========================
+   SEND MEDIA MESSAGE
+========================= */
+export const sendMediaMessage = async ({
+  token,
+  conversationId,
+  files,
+  clientId,
+}) => {
+  const formData = new FormData();
 
-  const res = await api.post("/chats/send", requestBody, {
-    headers: { Authorization: `Bearer ${token}` },
+  formData.append("conversationId", conversationId);
+  formData.append("clientId", clientId);
+
+  files.forEach((file, idx) => formData.append("files", file));
+
+  const res = await api.post("/chats/send/media", formData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 
   return res.data;

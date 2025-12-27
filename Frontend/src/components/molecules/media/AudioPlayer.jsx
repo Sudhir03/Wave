@@ -1,6 +1,7 @@
-import { Play, Pause } from "lucide-react";
+import { Play, Pause, Upload } from "lucide-react";
 import { Button } from "@/components/atoms/Button";
 import { useState, useRef, useEffect } from "react";
+import { formatFileSize } from "@/lib/utils";
 
 export function AudioPlayer({
   fileName,
@@ -8,6 +9,7 @@ export function AudioPlayer({
   audioUrl,
   isActive,
   onPlay,
+  isUploading,
 }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -33,23 +35,21 @@ export function AudioPlayer({
     };
   }, []);
 
-  // Pause if not active
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
     if (!isActive && isPlaying) {
-      audio.pause();
+      audioRef.current?.pause();
       setIsPlaying(false);
     }
   }, [isActive]);
 
   const togglePlayPause = () => {
+    if (isUploading) return;
+
     const audio = audioRef.current;
     if (!audio) return;
 
     if (!isPlaying) {
-      onPlay?.(); // Notify parent to make this active
+      onPlay?.();
       audio.play();
     } else {
       audio.pause();
@@ -58,68 +58,70 @@ export function AudioPlayer({
   };
 
   const handleProgressClick = (e) => {
+    if (isUploading) return;
+
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || !duration) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const width = rect.width;
-    const newTime = (clickX / width) * duration;
-
-    audio.currentTime = newTime;
-    setCurrentTime(newTime);
+    audio.currentTime = ((e.clientX - rect.left) / rect.width) * duration;
   };
 
   const formatTime = (time) => {
     if (isNaN(time)) return "0:00";
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+    const m = Math.floor(time / 60);
+    const s = Math.floor(time % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const progress = duration ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100 max-w-sm">
+    <div className="relative flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100 max-w-sm">
       <audio ref={audioRef} src={audioUrl} preload="metadata" />
 
-      {/* Play/Pause Button */}
+      {/* PLAY / PAUSE */}
       <Button
         variant="ghost"
         size="sm"
-        className="flex-shrink-0 w-10 h-10 p-0 bg-blue-500 hover:bg-blue-600 rounded-lg"
+        disabled={isUploading}
+        className="relative w-10 h-10 p-0 bg-blue-500 hover:bg-blue-600 rounded-lg"
         onClick={togglePlayPause}
       >
+        {/* Play / Pause */}
         {isPlaying ? (
           <Pause className="w-5 h-5 text-white" />
         ) : (
           <Play className="w-5 h-5 text-white ml-0.5" />
         )}
+
+        {/* Upload overlay ON TOP of Play/Pause */}
+        {isUploading && (
+          <span className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg">
+            <Upload className="w-4 h-4 text-white animate-pulse" />
+          </span>
+        )}
       </Button>
 
-      {/* Audio Info and Progress */}
+      {/* INFO */}
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-gray-900 truncate mb-1">
-          {fileName}
-        </div>
+        <div className="text-sm font-medium truncate mb-1">{fileName}</div>
 
-        {/* Progress Bar */}
         <div
           className="w-full h-1 bg-gray-200 rounded-full cursor-pointer mb-1"
           onClick={handleProgressClick}
         >
           <div
-            className="h-full bg-blue-500 rounded-full transition-all duration-100"
+            className="h-full bg-blue-500 rounded-full"
             style={{ width: `${progress}%` }}
           />
         </div>
 
-        {/* Time and Size */}
-        <div className="flex justify-between text-xs text-gray-500">
+        <div className="flex items-center gap-1 text-xs text-gray-500">
           <span>
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
-          <span>{fileSize}</span>
+          <span>{formatFileSize(fileSize)}</span>
         </div>
       </div>
     </div>
