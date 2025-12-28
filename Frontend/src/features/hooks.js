@@ -1,24 +1,28 @@
+// =======================
+// Imports – React & Router
+// =======================
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+
+// =======================
+// Imports – React Query
+// =======================
 import {
   useInfiniteQuery,
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
+
+// =======================
+// Imports – Auth & Realtime
+// =======================
 import { useAuth } from "@clerk/clerk-react";
 import socket from "@/socket";
 import { getMessages, sendTextMessage, sendMediaMessage } from "@/api/chat";
 
-/* =========================
-   Helpers
-========================= */
-const formatLastSeen = (date) =>
-  new Date(date).toLocaleString("en-US", {
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
+// =======================
+// Message Status Priority
+// =======================
 const statusRank = {
   sending: 0,
   sent: 1,
@@ -26,15 +30,18 @@ const statusRank = {
   read: 3,
 };
 
-/* =========================================================
-   Hook
-========================================================= */
+// =======================
+// Chat Detail Hook
+// =======================
 export function useChatDetail() {
+  // =======================
+  // Route Params
+  // =======================
   const { chatId } = useParams();
 
-  /* =========================
-     Local State
-  ========================= */
+  // =======================
+  // Local State
+  // =======================
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
 
@@ -50,14 +57,28 @@ export function useChatDetail() {
   const messagesEndRef = useRef(null);
   const topRef = useRef(null);
 
-  /* =========================
-     Auth & Query
-  ========================= */
+  // =======================
+  // Auth & Query Setup
+  // =======================
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
+
   const profile = queryClient.getQueryData(["myProfile"]);
   const userId = profile?.user?._id;
 
+  // =======================
+  // Reset State on Chat Change
+  // =======================
+  useEffect(() => {
+    if (!chatId) return;
+
+    setMessage("");
+    socket.emit("typing_stop", { chatId, userId });
+  }, [chatId, userId]);
+
+  // =======================
+  // Fetch Messages (Paginated)
+  // =======================
   /* =========================
      Reset cache on chat switch
   ========================= */
@@ -83,6 +104,9 @@ export function useChatDetail() {
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
 
+  // =======================
+  // Normalize & Sort Messages
+  // =======================
   const messages =
     data?.pages
       ?.flatMap((p) => p.messages)
@@ -91,16 +115,16 @@ export function useChatDetail() {
           new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       ) || [];
 
-  /* =========================
-     Auto scroll
-  ========================= */
+  // =======================
+  // Auto Scroll to Bottom
+  // =======================
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  /* =========================
-     Join / Leave chat
-  ========================= */
+  // =======================
+  // Socket: Chat Join / Leave
+  // =======================
   useEffect(() => {
     if (!chatId || !userId) return;
 
@@ -108,12 +132,16 @@ export function useChatDetail() {
     return () => socket.emit("leave_chat", { chatId, userId });
   }, [chatId, userId]);
 
-  /* =========================
-     Receive message
-  ========================= */
+  // =======================
+  // Socket Listeners (Merged)
+  // - receive_message
+  // - message_status_update
+  // - typing indicators
+  // =======================
   useEffect(() => {
     if (!chatId) return;
 
+    // 🔹 Receive new or optimistic-confirmed messages
     const handleReceiveMessage = (data) => {
       if (data.conversationId !== chatId) return;
 
@@ -141,34 +169,69 @@ export function useChatDetail() {
         }));
 
         if (!replaced) {
-          const last = pages.length - 1;
-          pages[last] = {
-            ...pages[last],
-            messages: [...pages[last].messages, data],
-          };
+          pages[pages.length - 1].messages.push(data);
         }
 
         return { ...old, pages };
       });
     };
 
-    socket.on("receive_message", handleReceiveMessage);
-    return () => socket.off("receive_message", handleReceiveMessage);
-  }, [chatId]);
+    // 🔹 Update delivery / read status
+    const handleStatusUpdate = ({ messageIds, status }) => {
+      queryClient.setQueryData(["messages", chatId], (old) => {
+        if (!old) return old;
 
-  /* =========================
-     Typing indicator
-  ========================= */
-  useEffect(() => {
-    socket.on("user_typing_start", () => setIsTyping(true));
-    socket.on("user_typing_stop", () => setIsTyping(false));
-
-    return () => {
-      socket.off("user_typing_start");
-      socket.off("user_typing_stop");
+        return {
+          ...old,
+          pages: old.pages.map((page) => ({
+            ...page,
+            messages: page.messages.map((m) =>
+              messageIds.includes(m._id) && m.sender._id === userId
+                ? {
+                    ...m,
+                    status:
+                      statusRank[status] > statusRank[m.status]
+                        ? status
+                        : m.status,
+                  }
+                : m
+            ),
+          })),
+        };
+      });
     };
-  }, []);
 
+    // 🔹 Typing indicators
+    const handleTypingStart = ({ userId: typingUser }) => {
+      if (typingUser !== userId) setIsTyping(true);
+    };
+
+    const handleTypingStop = ({ userId: stoppedUser }) => {
+      if (stoppedUser !== userId) setIsTyping(false);
+    };
+
+    // =======================
+    // Register Socket Events
+    // =======================
+    socket.on("receive_message", handleReceiveMessage);
+    socket.on("message_status_update", handleStatusUpdate);
+    socket.on("user_typing_start", handleTypingStart);
+    socket.on("user_typing_stop", handleTypingStop);
+
+    // =======================
+    // Cleanup
+    // =======================
+    return () => {
+      socket.off("receive_message", handleReceiveMessage);
+      socket.off("message_status_update", handleStatusUpdate);
+      socket.off("user_typing_start", handleTypingStart);
+      socket.off("user_typing_stop", handleTypingStop);
+    };
+  }, [chatId, userId, queryClient]);
+
+  // =======================
+  // Exposed API
+  // =======================
   /* =========================
      Optimistic helper
   ========================= */
@@ -280,7 +343,7 @@ export function useChatDetail() {
      Handlers
   ========================= */
   const handleTyping = (action) => {
-    socket.emit(action, chatId);
+    socket.emit(action, { chatId, userId });
   };
 
   const handleSendText = () => {
@@ -315,11 +378,9 @@ export function useChatDetail() {
   return {
     chatId,
     userId,
-
     message,
     setMessage,
     isTyping,
-
     messages,
     messagesEndRef,
     topRef,
@@ -336,7 +397,5 @@ export function useChatDetail() {
     handleSendText,
     handleSendMedia,
     handleOpenGallery,
-
-    formatLastSeen,
   };
 }

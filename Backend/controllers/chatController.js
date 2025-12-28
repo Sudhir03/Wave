@@ -1,10 +1,17 @@
+// =======================
+// Imports – Models & Utils
+// =======================
 const Conversation = require("../models/conversationModel");
 const Message = require("../models/messageModel");
 const catchAsync = require("../utils/catchAsync");
 const uploadToCloudinary = require("../utils/uploadToCloudinary");
 
-const { getIO } = require("../socket/socket");
+// =======================
+// Imports – Socket & Presence
+// =======================
+const { getIO, isUserInChatRoom } = require("../socket/socket");
 const { getPresence } = require("../redis/presence");
+const getMediaPreview = require("../utils/getMediaPreview");
 
 /* =========================
    GET MY CONVERSATIONS
@@ -17,6 +24,9 @@ exports.getMyConversations = async (req, res) => {
     const query = { participants: userId };
     if (cursor) query.updatedAt = { $lt: new Date(cursor) };
 
+    // =======================
+    // Fetch Conversations
+    // =======================
     const conversations = await Conversation.find(query)
       .sort({ updatedAt: -1 })
       .limit(Number(limit))
@@ -29,20 +39,40 @@ exports.getMyConversations = async (req, res) => {
         select: "content senderId timestamp",
       });
 
-    const formatted = conversations.map((conv) => {
-      const partner = conv.participants.find(
-        (p) => p._id.toString() !== userId
-      );
+    // =======================
+    // Format Conversations
+    // =======================
+    const formatted = await Promise.all(
+      conversations.map(async (conv) => {
+        const partner = conv.participants.find(
+          (p) => p._id.toString() !== userId
+        );
 
-      return {
-        conversationId: conv._id,
-        type: conv.type,
-        partner,
-        lastMessage: conv.lastMessage,
-        updatedAt: conv.updatedAt,
-      };
-    });
+        // Presence from Redis
+        const presence = await getPresence(partner._id.toString());
 
+        return {
+          conversationId: conv._id,
+          type: conv.type,
+          partner: {
+            ...partner.toObject(),
+            isOnline:
+              presence.status === "online" || presence.status === "in_chat",
+            lastSeen: presence.lastSeen || partner.lastSeen,
+          },
+          lastMessage: {
+            content: conv.lastMessagePreview || "",
+            timestamp: conv.updatedAt,
+          },
+          updatedAt: conv.updatedAt,
+          unreadCount: conv.unreadCount?.get(userId) || 0,
+        };
+      })
+    );
+
+    // =======================
+    // Pagination Cursor
+    // =======================
     const nextCursor =
       conversations.length === Number(limit)
         ? conversations[conversations.length - 1].updatedAt
@@ -58,6 +88,9 @@ exports.getMyConversations = async (req, res) => {
    GET MESSAGES
 ========================= */
 exports.getMessages = async (req, res) => {
+  // =======================
+  // Extract Params
+  // =======================
   const { conversationId } = req.params;
   const { cursor, limit = 10 } = req.query;
   const userId = req.userId;
@@ -79,6 +112,9 @@ exports.getMessages = async (req, res) => {
     .limit(Number(limit) + 1)
     .populate("sender", "fullName profileImageUrl");
 
+  // =======================
+  // Pagination Handling
+  // =======================
   const hasNextPage = messages.length > limit;
   if (hasNextPage) messages.pop();
 
@@ -92,7 +128,7 @@ exports.getMessages = async (req, res) => {
 };
 
 /* =========================
-   SEND TEXT MESSAGE
+   SEND TEXT MESSAGE (FIXED)
 ========================= */
 exports.sendTextMessage = catchAsync(async (req, res) => {
   const { userId } = req;
@@ -111,18 +147,25 @@ exports.sendTextMessage = catchAsync(async (req, res) => {
     (id) => id.toString() !== userId.toString()
   );
 
+  /* =========================
+     Presence → status
+  ========================= */
   const presence = await getPresence(receiverId);
   let status = "sent";
 
-  if (
-    presence?.status === "in_chat" &&
-    presence.activeChatId === conversationId.toString()
-  ) {
-    status = "read";
-  } else if (presence?.status === "online" || presence?.status === "in_chat") {
+  const isReceiverReading = isUserInChatRoom(
+    receiverId.toString(),
+    conversationId.toString()
+  );
+
+  if (isReceiverReading) status = "read";
+  else if (presence?.status === "online" || presence?.status === "in_chat") {
     status = "delivered";
   }
 
+  /* =========================
+     SAVE MESSAGE
+  ========================= */
   const message = await Message.create({
     conversationId,
     sender: userId,
@@ -137,11 +180,61 @@ exports.sendTextMessage = catchAsync(async (req, res) => {
     "fullName profileImageUrl"
   );
 
+  /* =========================
+     UPDATE CONVERSATION
+  ========================= */
+  const update = {
+    lastMessage: message._id,
+    lastMessagePreview: content, // ✅ ADD THIS
+    updatedAt: message.timestamp,
+    $set: { [`unreadCount.${userId}`]: 0 },
+  };
+
+  if (!isReceiverReading) {
+    update.$inc = { [`unreadCount.${receiverId}`]: 1 };
+  }
+
+  await Conversation.findByIdAndUpdate(conversationId, update);
+
+  /* =========================
+     FETCH ABSOLUTE UNREAD
+  ========================= */
+  const updatedConversation = await Conversation.findById(conversationId);
+  const receiverUnread =
+    updatedConversation.unreadCount.get(receiverId.toString()) || 0;
+
+  /* =========================
+     SOCKET EMITS
+  ========================= */
   const io = getIO();
+
+  // Chat screen (real-time message)
   io.to(conversationId.toString()).emit("receive_message", {
     ...populatedMessage.toObject(),
     clientId,
     status,
+  });
+
+  // Receiver chat list
+  io.to(receiverId.toString()).emit("conversation_update", {
+    conversationId,
+    lastMessage: {
+      content: populatedMessage.content,
+      timestamp: populatedMessage.timestamp,
+    },
+    updatedAt: populatedMessage.timestamp,
+    unreadCount: receiverUnread,
+  });
+
+  // Sender chat list
+  io.to(userId.toString()).emit("conversation_update", {
+    conversationId,
+    lastMessage: {
+      content: populatedMessage.content,
+      timestamp: populatedMessage.timestamp,
+    },
+    updatedAt: populatedMessage.timestamp,
+    unreadCount: 0,
   });
 
   res.status(201).json({
@@ -152,7 +245,7 @@ exports.sendTextMessage = catchAsync(async (req, res) => {
 
 /* =========================
    SEND MEDIA MESSAGE
-========================= */
+   =========================*/
 exports.sendMediaMessage = catchAsync(async (req, res) => {
   const { userId } = req;
   const { conversationId, clientId } = req.body;
@@ -161,10 +254,12 @@ exports.sendMediaMessage = catchAsync(async (req, res) => {
     return res.status(400).json({ message: "Media files required" });
   }
 
+  // =======================
+  // Validate Conversation
+  // =======================
   const conversation = await Conversation.findById(conversationId);
-  if (!conversation) {
+  if (!conversation)
     return res.status(404).json({ message: "Conversation not found" });
-  }
 
   const receiverId = conversation.participants.find(
     (id) => id.toString() !== userId.toString()
@@ -235,15 +330,18 @@ exports.sendMediaMessage = catchAsync(async (req, res) => {
   const presence = await getPresence(receiverId);
   let status = "sent";
 
-  if (
-    presence?.status === "in_chat" &&
-    presence.activeChatId === conversationId.toString()
-  ) {
-    status = "read";
-  } else if (presence?.status === "online" || presence?.status === "in_chat") {
-    status = "delivered";
-  }
+  const isReceiverReading = isUserInChatRoom(
+    receiverId.toString(),
+    conversationId.toString()
+  );
 
+  if (isReceiverReading) status = "read";
+  else if (presence?.status === "online" || presence?.status === "in_chat")
+    status = "delivered";
+
+  /* ----------------------
+     SAVE MESSAGE
+  ---------------------- */
   const message = await Message.create({
     conversationId,
     sender: userId,
@@ -258,13 +356,68 @@ exports.sendMediaMessage = catchAsync(async (req, res) => {
     "fullName profileImageUrl"
   );
 
+  /* ----------------------
+     UPDATE CONVERSATION
+  ---------------------- */
+
+  const mediaPreview = getMediaPreview(media);
+
+  await Conversation.findByIdAndUpdate(conversationId, {
+    lastMessage: message._id,
+    lastMessagePreview: mediaPreview,
+    updatedAt: message.timestamp,
+    $set: { [`unreadCount.${userId}`]: 0 },
+    ...(isReceiverReading
+      ? {}
+      : { $inc: { [`unreadCount.${receiverId}`]: 1 } }),
+  });
+
+  /* ----------------------
+     FETCH ABSOLUTE UNREAD
+  ---------------------- */
+  const updatedConversation = await Conversation.findById(conversationId);
+  const receiverUnread =
+    updatedConversation.unreadCount.get(receiverId.toString()) || 0;
+
+  /* ----------------------
+     SOCKET EMITS
+  ---------------------- */
   const io = getIO();
+
+  // Chat screen (real-time message)
   io.to(conversationId.toString()).emit("receive_message", {
     ...populatedMessage.toObject(),
     clientId,
     status,
   });
 
+  // Receiver chat list
+  io.to(receiverId.toString()).emit("conversation_update", {
+    conversationId,
+    lastMessage: {
+      content: mediaPreview, // ✅ FIX
+      timestamp: populatedMessage.timestamp,
+    },
+
+    updatedAt: populatedMessage.timestamp,
+    unreadCount: receiverUnread,
+  });
+
+  // Sender chat list
+  io.to(userId.toString()).emit("conversation_update", {
+    conversationId,
+    lastMessage: {
+      content: mediaPreview,
+      timestamp: populatedMessage.timestamp,
+    },
+
+    updatedAt: populatedMessage.timestamp,
+    unreadCount: 0,
+  });
+
+  // =======================
+  // Response
+  // =======================
   res.status(201).json({
     isSuccess: true,
     sentMessage: populatedMessage,
