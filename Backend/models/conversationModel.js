@@ -27,6 +27,11 @@ const conversationSchema = new mongoose.Schema(
       ref: "Message",
       default: null,
     },
+
+    lastMessagePreview: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true,

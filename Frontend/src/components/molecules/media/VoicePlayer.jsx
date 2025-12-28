@@ -1,101 +1,87 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/atoms/Button";
-import { Play, Pause } from "lucide-react";
+import { Play, Pause, Upload } from "lucide-react";
 
-export function VoicePlayer({ audioSrc }) {
+export function VoicePlayer({ audioSrc, isUploading = false }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const audioRef = useRef(null);
 
-  const waveformBars = Array.from({ length: 40 }, (_, i) => {
-    const height = Math.random() * 100 + 20; // Random height between 20-120%
-    // Calculate progress based on current time and duration
-    const progress = duration > 0 ? currentTime / duration : 0;
-    const isActive = i < progress * 40;
-    return { height, isActive };
-  });
+  // 🔒 Freeze waveform once (no re-random on re-render)
+  const waveformRef = useRef(
+    Array.from({ length: 40 }, () => Math.random() * 60 + 20)
+  );
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const updateTime = () => setCurrentTime(audio.currentTime);
-    const updateDuration = () => setDuration(audio.duration);
-    const handleEnded = () => setIsPlaying(false);
+    const onTime = () => setCurrentTime(audio.currentTime);
+    const onMeta = () => setDuration(audio.duration);
+    const onEnd = () => setIsPlaying(false);
 
-    audio.addEventListener("timeupdate", updateTime);
-    audio.addEventListener("loadedmetadata", updateDuration);
-    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("timeupdate", onTime);
+    audio.addEventListener("loadedmetadata", onMeta);
+    audio.addEventListener("ended", onEnd);
 
     return () => {
-      audio.removeEventListener("timeupdate", updateTime);
-      audio.removeEventListener("loadedmetadata", updateDuration);
-      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("timeupdate", onTime);
+      audio.removeEventListener("loadedmetadata", onMeta);
+      audio.removeEventListener("ended", onEnd);
     };
   }, []);
 
-  const togglePlayPause = () => {
+  const togglePlay = () => {
+    if (isUploading) return;
+
     const audio = audioRef.current;
     if (!audio) return;
 
-    if (isPlaying) {
-      audio.pause();
-    } else {
-      audio.play();
-    }
+    if (isPlaying) audio.pause();
+    else audio.play();
+
     setIsPlaying(!isPlaying);
   };
 
-  const handleWaveformClick = (index) => {
-    const audio = audioRef.current;
-    if (!audio || !duration) return;
-
-    const newTime = (index / (waveformBars.length - 1)) * duration;
-    audio.currentTime = newTime;
-    setCurrentTime(newTime);
-  };
+  const progress = duration > 0 ? currentTime / duration : 0;
 
   return (
-    <div className="flex items-start gap-3 p-4 max-w-md">
-      <div className="flex-1 space-y-2">
-        <div className="flex items-center gap-3 bg-gray-100 dark:bg-gray-800 rounded-2xl p-3">
-          <Button
-            size="sm"
-            className="w-8 h-8 rounded-full bg-blue-500 hover:bg-blue-600 text-white p-0 flex-shrink-0"
-            onClick={togglePlayPause}
-          >
-            {isPlaying ? (
-              <Pause className="w-4 h-4" />
-            ) : (
-              <Play className="w-4 h-4 ml-0.5" />
-            )}
-          </Button>
-
-          <div className="flex items-end gap-0.5 flex-1 h-8 cursor-pointer group">
-            {waveformBars.map((bar, index) => (
-              <div
-                key={index}
-                className={`w-1 rounded-full transition-all duration-150 hover:opacity-80 ${
-                  bar.isActive
-                    ? "bg-blue-500"
-                    : "bg-blue-200 dark:bg-blue-300 hover:bg-blue-300 dark:hover:bg-blue-400"
-                }`}
-                style={{
-                  height: `${Math.max(bar.height * 0.3, 8)}px`,
-                  minHeight: "4px",
-                }}
-                onClick={() => handleWaveformClick(index)}
-                title={`Seek to ${Math.round(
-                  (index / (waveformBars.length - 1)) * 100
-                )}%`}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-
+    <div className="relative flex items-center gap-3 p-3 bg-gray-100 dark:bg-gray-800 rounded-2xl max-w-md">
       <audio ref={audioRef} src={audioSrc} preload="metadata" />
+
+      {/* Play / Pause */}
+      <Button
+        size="sm"
+        onClick={togglePlay}
+        disabled={isUploading}
+        className="relative w-9 h-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white p-0 shrink-0"
+      >
+        {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+
+        {/* Upload overlay */}
+        {isUploading && (
+          <span className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full">
+            <Upload className="w-4 h-4 text-white animate-pulse" />
+          </span>
+        )}
+      </Button>
+
+      {/* Waveform */}
+      <div className="flex items-end gap-[3px] flex-1 h-8">
+        {waveformRef.current.map((h, i) => {
+          const active = i / waveformRef.current.length < progress;
+          return (
+            <div
+              key={i}
+              className={`w-[3px] rounded-full ${
+                active ? "bg-blue-500" : "bg-blue-200 dark:bg-blue-300"
+              }`}
+              style={{ height: `${h}%` }}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }

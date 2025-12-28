@@ -18,7 +18,7 @@ import {
 // =======================
 import { useAuth } from "@clerk/clerk-react";
 import socket from "@/socket";
-import { getMessages, sendMessage } from "@/api/chat";
+import { getMessages, sendTextMessage, sendMediaMessage } from "@/api/chat";
 
 // =======================
 // Message Status Priority
@@ -45,9 +45,15 @@ export function useChatDetail() {
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
 
-  // =======================
-  // Refs
-  // =======================
+  // 🔥 Gallery state (RESTORED)
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [galleryMedia, setGalleryMedia] = useState([]);
+  const [galleryStartIndex, setGalleryStartIndex] = useState(0);
+  const [activeMediaId, setActiveMediaId] = useState(null);
+
+  /* =========================
+     Refs
+  ========================= */
   const messagesEndRef = useRef(null);
   const topRef = useRef(null);
 
@@ -73,6 +79,17 @@ export function useChatDetail() {
   // =======================
   // Fetch Messages (Paginated)
   // =======================
+  /* =========================
+     Reset cache on chat switch
+  ========================= */
+  useEffect(() => {
+    if (!chatId) return;
+    queryClient.removeQueries({ queryKey: ["messages", chatId], exact: true });
+  }, [chatId]);
+
+  /* =========================
+     Messages
+  ========================= */
   const { data } = useInfiniteQuery({
     queryKey: ["messages", chatId],
     enabled: !!chatId,
@@ -112,10 +129,7 @@ export function useChatDetail() {
     if (!chatId || !userId) return;
 
     socket.emit("join_chat", { chatId, userId });
-
-    return () => {
-      socket.emit("leave_chat", { chatId, userId });
-    };
+    return () => socket.emit("leave_chat", { chatId, userId });
   }, [chatId, userId]);
 
   // =======================
@@ -216,78 +230,151 @@ export function useChatDetail() {
   }, [chatId, userId, queryClient]);
 
   // =======================
-  // Emit Typing Events
+  // Exposed API
   // =======================
-  const handleTyping = (value) => {
-    if (!chatId) return;
+  /* =========================
+     Optimistic helper
+  ========================= */
+  const addOptimisticMessage = ({ clientId, type, content, media }) => {
+    queryClient.setQueryData(["messages", chatId], (old) => {
+      if (!old) return old;
 
-    if (value.trim().length > 0) {
-      socket.emit("typing_start", { chatId, userId });
-    } else {
-      socket.emit("typing_stop", { chatId, userId });
-    }
+      const optimistic = {
+        _id: clientId,
+        clientId,
+        type,
+        content,
+        media,
+        timestamp: new Date().toISOString(),
+        sender: { _id: userId },
+        status: "sending",
+      };
+
+      const pages = [...old.pages];
+      const last = pages.length - 1;
+      pages[last] = {
+        ...pages[last],
+        messages: [...pages[last].messages, optimistic],
+      };
+
+      return { ...old, pages };
+    });
   };
 
-  // =======================
-  // Send Message Mutation
-  // =======================
-  const sendMessageMutation = useMutation({
-    mutationFn: async ({ content, media, clientId }) => {
+  /* =========================
+     Mutations
+  ========================= */
+  const sendTextMutation = useMutation({
+    mutationFn: async ({ content, clientId }) => {
       const token = await getToken();
-      return sendMessage({
+      return sendTextMessage({
         token,
         conversationId: chatId,
         content,
-        media,
         clientId,
+      });
+    },
+    onMutate: ({ content, clientId }) => {
+      addOptimisticMessage({
+        clientId,
+        type: "text",
+        content,
+        media: [],
       });
     },
   });
 
-  // =======================
-  // Handle Send (Optimistic UI)
-  // =======================
-  const handleSend = (mediaFiles = []) => {
-    if (!message.trim() && mediaFiles.length === 0) return;
+  const sendMediaMutation = useMutation({
+    mutationFn: async ({ files, clientId }) => {
+      const token = await getToken();
+      return sendMediaMessage({
+        token,
+        conversationId: chatId,
+        files,
+        clientId,
+      });
+    },
 
-    socket.emit("typing_stop", { chatId, userId });
+    onMutate: ({ files, clientId }) => {
+      const optimisticMedia = files.map((file) => {
+        const previewUrl = URL.createObjectURL(file);
 
-    const clientId = `client-${Date.now()}`;
+        let type = "document";
+        let thumbnail = null;
+        let isVoice = false; // 🔥 ADD THIS
 
-    const optimisticMessage = {
-      _id: clientId,
-      clientId,
-      content: message,
-      sender: { _id: userId },
-      status: "sending",
-      timestamp: new Date().toISOString(),
-    };
+        if (file.type.startsWith("image")) {
+          type = "image";
+          thumbnail = previewUrl;
+        } else if (file.type.startsWith("video")) {
+          type = "video";
+          thumbnail = previewUrl;
+        } else if (file.type.startsWith("audio")) {
+          type = "audio";
 
-    queryClient.setQueryData(["messages", chatId], (old) => {
-      if (!old) return old;
+          // 🔥 IMPORTANT LOGIC
+          if (file.name.startsWith("voice-")) {
+            isVoice = true;
+          }
+        }
 
-      return {
-        ...old,
-        pages: old.pages.map((p, i) =>
-          i === old.pages.length - 1
-            ? { ...p, messages: [...p.messages, optimisticMessage] }
-            : p
-        ),
-      };
-    });
+        return {
+          _id: `tmp-${crypto.randomUUID()}`,
+          type,
+          isVoice, // 🔥 ADD THIS
+          url: previewUrl,
+          thumbnail,
+          fileName: file.name,
+          fileSize: file.size,
+          isOptimistic: true,
+        };
+      });
 
-    sendMessageMutation.mutate({
-      content: message,
-      media: mediaFiles,
-      clientId,
-    });
+      addOptimisticMessage({
+        clientId,
+        type: "media",
+        content: "",
+        media: optimisticMedia,
+      });
+    },
+  });
 
+  /* =========================
+     Handlers
+  ========================= */
+  const handleTyping = (action) => {
+    socket.emit(action, { chatId, userId });
+  };
+
+  const handleSendText = () => {
+    if (!message.trim()) return;
+
+    const clientId = `t-${Date.now()}`;
+    socket.emit("typing_stop", chatId);
+    sendTextMutation.mutate({ content: message.trim(), clientId });
     setMessage("");
   };
 
-  // =======================
-  // Exposed API
-  // =======================
+  const handleSendMedia = (mediaItems) => {
+    if (!mediaItems?.length) return;
+
+    const clientId = `m-${Date.now()}`;
+
+    sendMediaMutation.mutate({
+      clientId,
+      files: mediaItems.map((m) => m.file),
+    });
+  };
+
+  const handleOpenGallery = (media, index) => {
+    setGalleryMedia(media);
+    setGalleryStartIndex(index);
+    setIsGalleryOpen(true);
+  };
+
+  /* =========================
+     Expose API
+  ========================= */
   return {
     chatId,
     userId,
@@ -297,7 +384,18 @@ export function useChatDetail() {
     messages,
     messagesEndRef,
     topRef,
+
+    // gallery
+    isGalleryOpen,
+    setIsGalleryOpen,
+    galleryMedia,
+    galleryStartIndex,
+    activeMediaId,
+    setActiveMediaId,
+
     handleTyping,
-    handleSend,
+    handleSendText,
+    handleSendMedia,
+    handleOpenGallery,
   };
 }

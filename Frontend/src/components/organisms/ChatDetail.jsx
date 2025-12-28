@@ -1,5 +1,5 @@
 /* =========================
-hooks
+   hooks
 ========================= */
 import { useChatDetail } from "@/features/hooks";
 
@@ -35,14 +35,13 @@ import { BellOff, Pin, PinOff, Send, UserX } from "lucide-react";
 /* =========================
    Socket
 ========================= */
-import socket from "@/socket";
 import { MessageStatus } from "../molecules/MessageStatus";
 import { useOutletContext } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 
 export default function ChatDetail() {
   /* =========================
-     GET REAL CHAT DATA
+     CONTEXT
   ========================= */
   const {
     activeChat,
@@ -67,6 +66,9 @@ export default function ChatDetail() {
 
   const chat = liveChat?.partner || activeChat?.partner;
 
+  /* =========================
+     CHAT HOOK
+  ========================= */
   const {
     chatId,
     userId,
@@ -74,18 +76,22 @@ export default function ChatDetail() {
     message,
     setMessage,
     isTyping,
+
+    messages,
+    messagesEndRef,
+    topRef,
+
+    // gallery
     isGalleryOpen,
     setIsGalleryOpen,
     galleryMedia,
     galleryStartIndex,
+    activeMediaId,
+    setActiveMediaId,
 
-    messagesEndRef,
-    topRef,
-
-    messages,
-
-    handleSend,
     handleTyping,
+    handleSendText,
+    handleSendMedia,
     handleOpenGallery,
   } = useChatDetail();
 
@@ -100,21 +106,18 @@ export default function ChatDetail() {
   return (
     <div className="h-full flex flex-col pb-1">
       {/* ================= HEADER ================= */}
-      <div className="flex items-center justify-between border-b-2 border-border p-2.5">
+      <div className="flex items-center justify-between border-b p-2.5">
         <div className="flex items-center gap-2">
           <Avatar className="w-12 h-12">
-            <AvatarImage src={chat.profileImageUrl} alt={chat.fullName} />
-            <AvatarFallback className="bg-linear-to-r from-fuchsia-500 to-purple-600 text-white font-medium">
-              {chat.fullName.charAt(0)}
-            </AvatarFallback>
+            <AvatarImage src={chat.profileImageUrl} />
+            <AvatarFallback>{chat.fullName?.charAt(0)}</AvatarFallback>
           </Avatar>
 
-          <div className="flex flex-col leading-tight">
-            <span className="font-semibold text-foreground max-w-48 truncate">
+          <div className="flex flex-col">
+            <span className="font-semibold truncate max-w-48">
               {chat.fullName}
             </span>
-
-            <span className="text-sm text-secondary">
+            <span className="text-sm text-muted-foreground">
               {isTyping ? (
                 <span className="italic text-primary">typing...</span>
               ) : chat.isOnline ? (
@@ -126,7 +129,7 @@ export default function ChatDetail() {
           </div>
         </div>
 
-        <div className="flex items-center text-foreground">
+        <div className="flex items-center gap-1">
           <ChatSearch messages={messages} />
           <CallPopover type="audio" />
           <CallPopover type="video" />
@@ -146,17 +149,12 @@ export default function ChatDetail() {
                     ? PinOff
                     : Pin,
                 },
-                onClick: () => {
-                  if (
-                    pinnedUsers.some(
-                      (p) => p.conversationId === activeChat.conversationId
-                    )
-                  ) {
-                    removePin(activeChat.conversationId);
-                  } else {
-                    addPin(activeChat);
-                  }
-                },
+                onClick: () =>
+                  pinnedUsers.some(
+                    (p) => p.conversationId === activeChat.conversationId
+                  )
+                    ? removePin(activeChat.conversationId)
+                    : addPin(activeChat),
               },
               {
                 label: mutedUsers.includes(activeChat.conversationId)
@@ -178,64 +176,135 @@ export default function ChatDetail() {
       </div>
 
       {/* ================= MESSAGES ================= */}
-      <div className="flex-1 bg-background overflow-y-auto p-4 space-y-2 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 space-y-2">
         <div ref={topRef} />
 
-        {messages.map((msg, i) => (
-          <div
-            key={msg._id}
-            className={`flex flex-col ${
-              msg.sender._id === userId ? "items-end" : "items-start"
-            } space-y-1`}
-          >
-            {msg.content && (
-              <div
-                className={`max-w-xs px-3 py-2 rounded-lg ${
-                  msg.sender._id === userId
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-foreground"
-                }`}
-              >
-                {msg.content}
-              </div>
-            )}
+        {messages.map((msg, i) => {
+          const showTime =
+            !messages[i + 1] ||
+            formatTime(messages[i + 1].timestamp) !== formatTime(msg.timestamp);
 
+          return (
             <div
-              className={`flex items-center gap-1 ${
-                msg.sender._id === userId ? "justify-end" : "justify-start"
+              key={msg._id}
+              className={`flex flex-col ${
+                msg.sender._id === userId ? "items-end" : "items-start"
               }`}
             >
-              <span className="text-xs text-muted-foreground">
-                {formatTime(msg.timestamp)}
-              </span>
-              {msg.sender._id === userId && (
-                <MessageStatus status={msg.status} />
+              {/* Text */}
+              {msg.content && (
+                <div
+                  className={`max-w-xs px-3 py-2 rounded-lg ${
+                    msg.sender._id === userId
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted"
+                  }`}
+                >
+                  {msg.content}
+                </div>
+              )}
+
+              {/* Media */}
+              {msg.media?.length > 0 && (
+                <>
+                  <div className="mt-1 flex gap-2 flex-wrap">
+                    {msg.media
+                      .filter((m) => m.type === "image" || m.type === "video")
+                      .slice(0, 5)
+                      .map((m, idx) =>
+                        m.type === "image" ? (
+                          <ImageAttachment
+                            key={idx}
+                            url={m.thumbnail}
+                            isUploading={m.isOptimistic}
+                            onClick={() => handleOpenGallery(msg.media, idx)}
+                          />
+                        ) : (
+                          <VideoAttachment
+                            key={idx}
+                            thumbnail={m.thumbnail}
+                            isUploading={m.isOptimistic}
+                            onClick={() => handleOpenGallery(msg.media, idx)}
+                          />
+                        )
+                      )}
+                  </div>
+
+                  <div className="mt-2 space-y-2">
+                    {msg.media.map((m, idx) => {
+                      if (m.type === "document")
+                        return (
+                          <DocumentAttachment
+                            key={idx}
+                            {...m}
+                            isUploading={m.isOptimistic}
+                          />
+                        );
+
+                      if (m.type === "audio" && m.isVoice)
+                        return (
+                          <VoicePlayer
+                            key={idx}
+                            audioSrc={m.url}
+                            isUploading={m.isOptimistic}
+                          />
+                        );
+
+                      if (m.type === "audio")
+                        return (
+                          <AudioPlayer
+                            key={idx}
+                            {...m}
+                            isUploading={m.isOptimistic}
+                            isActive={
+                              activeMediaId === `audio-${msg._id}-${idx}`
+                            }
+                            onPlay={() =>
+                              setActiveMediaId(`audio-${msg._id}-${idx}`)
+                            }
+                          />
+                        );
+
+                      return null;
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* Time + Status */}
+              {showTime && (
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-xs text-muted-foreground">
+                    {formatTime(msg.timestamp)}
+                  </span>
+                  {msg.sender._id === userId && (
+                    <MessageStatus status={msg.status} />
+                  )}
+                </div>
               )}
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         <div ref={messagesEndRef} />
       </div>
 
       {/* ================= INPUT ================= */}
       <div className="p-2 flex items-center gap-2">
-        <MediaPickerPopover onSelect={(files) => handleSend(files)} />
-        <EmojiPopover onSelect={(emoji) => setMessage(message + emoji)} />
-        <VoiceMessageSender onVoiceSend={(m) => handleSend([m])} />
+        <MediaPickerPopover onSelect={handleSendMedia} />
+        <EmojiPopover onSelect={(e) => setMessage(message + e)} />
+        <VoiceMessageSender onVoiceSend={(m) => handleSendMedia([m])} />
 
         <Input
-          placeholder="Type a message..."
           value={message}
-          onChange={(e) => {
-            setMessage(e.target.value);
-            handleTyping(e.target.value);
-          }}
-          onBlur={() => socket.emit("typing_stop", { chatId, userId })}
+          onChange={(e) => setMessage(e.target.value)}
+          onFocus={() => handleTyping("typing_start")}
+          onBlur={() => handleTyping("typing_stop")}
+          placeholder="Type a message..."
           className="flex-1"
         />
 
-        <Button onClick={() => handleSend()} size="icon">
+        <Button onClick={handleSendText} size="icon">
           <Send className="w-5 h-5" />
         </Button>
       </div>
