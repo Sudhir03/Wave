@@ -21,7 +21,6 @@ router.get(
 
 /* =========================
    SEND TEXT MESSAGE
-========================= */
 router.post("/send/text", requireAuth, chatController.sendTextMessage);
 
 /* =========================

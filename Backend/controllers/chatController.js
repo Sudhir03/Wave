@@ -128,9 +128,6 @@ exports.getMessages = async (req, res) => {
 };
 
 /* =========================
-   SEND TEXT MESSAGE
-========================= */
-/* =========================
    SEND TEXT MESSAGE (FIXED)
 ========================= */
 exports.sendTextMessage = catchAsync(async (req, res) => {
@@ -248,7 +245,7 @@ exports.sendTextMessage = catchAsync(async (req, res) => {
 
 /* =========================
    SEND MEDIA MESSAGE
-========================= */
+   =========================*/
 exports.sendMediaMessage = catchAsync(async (req, res) => {
   const { userId } = req;
   const { conversationId, clientId } = req.body;
@@ -257,10 +254,12 @@ exports.sendMediaMessage = catchAsync(async (req, res) => {
     return res.status(400).json({ message: "Media files required" });
   }
 
+  // =======================
+  // Validate Conversation
+  // =======================
   const conversation = await Conversation.findById(conversationId);
-  if (!conversation) {
+  if (!conversation)
     return res.status(404).json({ message: "Conversation not found" });
-  }
 
   const receiverId = conversation.participants.find(
     (id) => id.toString() !== userId.toString()
@@ -331,15 +330,18 @@ exports.sendMediaMessage = catchAsync(async (req, res) => {
   const presence = await getPresence(receiverId);
   let status = "sent";
 
-  if (
-    presence?.status === "in_chat" &&
-    presence.activeChatId === conversationId.toString()
-  ) {
-    status = "read";
-  } else if (presence?.status === "online" || presence?.status === "in_chat") {
-    status = "delivered";
-  }
+  const isReceiverReading = isUserInChatRoom(
+    receiverId.toString(),
+    conversationId.toString()
+  );
 
+  if (isReceiverReading) status = "read";
+  else if (presence?.status === "online" || presence?.status === "in_chat")
+    status = "delivered";
+
+  /* ----------------------
+     SAVE MESSAGE
+  ---------------------- */
   const message = await Message.create({
     conversationId,
     sender: userId,
@@ -357,11 +359,6 @@ exports.sendMediaMessage = catchAsync(async (req, res) => {
   /* ----------------------
      UPDATE CONVERSATION
   ---------------------- */
-
-  const isReceiverReading = isUserInChatRoom(
-    receiverId.toString(),
-    conversationId.toString()
-  );
 
   const mediaPreview = getMediaPreview(media);
 
@@ -418,6 +415,9 @@ exports.sendMediaMessage = catchAsync(async (req, res) => {
     unreadCount: 0,
   });
 
+  // =======================
+  // Response
+  // =======================
   res.status(201).json({
     isSuccess: true,
     sentMessage: populatedMessage,
