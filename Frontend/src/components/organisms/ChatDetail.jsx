@@ -30,7 +30,7 @@ import { formatLastSeen } from "@/lib/utils";
 /* =========================
    Icons
 ========================= */
-import { BellOff, Pin, PinOff, Send, UserX } from "lucide-react";
+import { BellOff, Pin, PinOff, Send } from "lucide-react";
 
 /* =========================
    Socket
@@ -43,16 +43,8 @@ export default function ChatDetail() {
   /* =========================
      CONTEXT
   ========================= */
-  const {
-    activeChat,
-    pinnedUsers,
-    addPin,
-    removePin,
-    mutedUsers,
-    toggleMute,
-    blockedUsers,
-    toggleBlock,
-  } = useOutletContext();
+  const { activeChat, pinnedUsers, addPin, removePin, mutedUsers, toggleMute } =
+    useOutletContext();
 
   const queryClient = useQueryClient();
   const conversations =
@@ -162,13 +154,6 @@ export default function ChatDetail() {
                   : "Mute",
                 icon: { component: BellOff },
                 onClick: () => toggleMute(activeChat),
-              },
-              {
-                label: blockedUsers.includes(activeChat.conversationId)
-                  ? "Unblock"
-                  : "Block",
-                icon: { component: UserX, props: { color: "red" } },
-                onClick: () => toggleBlock(activeChat),
               },
             ]}
           />

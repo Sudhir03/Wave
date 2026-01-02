@@ -241,7 +241,7 @@ exports.updatePassword = catchAsync(async (req, res) => {
   }
 });
 
-exports.searchUsers = catchAsync(async (req, res, next) => {
+exports.searchUsers = catchAsync(async (req, res) => {
   const { q } = req.query;
   const { userId: currentUserId } = req;
 
@@ -255,13 +255,37 @@ exports.searchUsers = catchAsync(async (req, res, next) => {
 
   const regex = new RegExp(q.trim(), "i");
 
+  /* =========================
+     1. Get current user block list
+  ========================= */
+  const me = await User.findById(currentUserId).select("blockedUsers");
+
+  const blockedByMe = me.blockedUsers || [];
+
+  /* =========================
+     2. Find users who blocked me
+  ========================= */
+  const usersWhoBlockedMe = await User.find({
+    blockedUsers: currentUserId,
+  }).select("_id");
+
+  const blockedMeIds = usersWhoBlockedMe.map((u) => u._id);
+
+  /* =========================
+     3. Build exclusion list
+  ========================= */
+  const excludedIds = [currentUserId, ...blockedByMe, ...blockedMeIds];
+
+  /* =========================
+     4. Final search query
+  ========================= */
   const users = await User.find({
     isDeleted: { $ne: true },
-    _id: { $ne: currentUserId },
+    _id: { $nin: excludedIds },
     $or: [{ username: regex }, { fullName: regex }],
   }).select("clerkUserId username fullName profileImageUrl");
 
-  res.status(200).json({
+  return res.status(200).json({
     isSuccess: true,
     results: users.length,
     users,

@@ -2,7 +2,7 @@
 // Imports – React & Router
 // =======================
 import { useEffect, useRef, useState } from "react";
-import { NavLink, Outlet, useParams } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 
 // =======================
 // Imports – Data Fetching
@@ -22,41 +22,59 @@ import { getMyConversations } from "@/api/chat";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/atoms/Avatar";
 import { Input } from "@/components/atoms/Input";
 import { Spinner } from "@/components/atoms/Spinner";
+import { Button } from "@/components/atoms/Button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/atoms/DropdownMenu";
 
 // =======================
-// Imports – Utils & Screens
+// Icons
+// =======================
+import {
+  MoreVertical,
+  Pin,
+  PinOff,
+  Volume,
+  VolumeX,
+  Trash2,
+  UserX,
+  X,
+} from "lucide-react";
+
+// =======================
+// Utils & Screens
 // =======================
 import { getAvatarGradient } from "@/lib/colorGradient";
-import EmptyChatScreen from "./EmptyChatScreen";
 import { formatLastSeen } from "@/lib/utils";
+import EmptyChatScreen from "@/components/atoms/EmptyChatScreen";
 
 // =======================
-// Chat Window Component
+// Component
 // =======================
 export default function ChatWindow() {
-  // =======================
-  // Route Params
-  // =======================
   const { chatId, friendId } = useParams();
+  const navigate = useNavigate();
 
-  // =======================
-  // Local UI State
-  // =======================
+  // -----------------------
+  // UI State
+  // -----------------------
   const [search, setSearch] = useState("");
   const [pinnedUsers, setPinnedUsers] = useState([]);
   const [mutedUsers, setMutedUsers] = useState([]);
-  const [blockedUsers, setBlockedUsers] = useState([]);
 
-  // =======================
-  // Auth, Query & Refs
-  // =======================
+  // -----------------------
+  // Auth & Query
+  // -----------------------
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
   const loadMoreRef = useRef(null);
 
-  // =======================
-  // Fetch Conversations (Paginated)
-  // =======================
+  // -----------------------
+  // Fetch Conversations
+  // -----------------------
   const { data, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery(
     {
       queryKey: ["conversations"],
@@ -68,21 +86,51 @@ export default function ChatWindow() {
     }
   );
 
-  // =======================
-  // Derived Chat Data
-  // =======================
   const chats = data?.pages.flatMap((p) => p.conversations) || [];
   const activeChat = chats.find((c) => c.conversationId === chatId);
 
-  // =======================
-  // Socket Listeners (Merged)
-  // - conversation_update
-  // - conversation_read
-  // - presence_update
-  // =======================
+  // -----------------------
+  // Helpers
+  // -----------------------
+  const isPinned = (id) => pinnedUsers.includes(id);
+  const isMuted = (id) => mutedUsers.includes(id);
+
+  const togglePin = (id) =>
+    setPinnedUsers((p) =>
+      p.includes(id) ? p.filter((x) => x !== id) : [id, ...p]
+    );
+
+  const toggleMute = (id) =>
+    setMutedUsers((m) =>
+      m.includes(id) ? m.filter((x) => x !== id) : [...m, id]
+    );
+
+  const deleteChat = (id) => {
+    queryClient.setQueryData(["conversations"], (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        pages: old.pages.map((page) => ({
+          ...page,
+          conversations: page.conversations.filter(
+            (c) => c.conversationId !== id
+          ),
+        })),
+      };
+    });
+    setPinnedUsers((p) => p.filter((x) => x !== id));
+  };
+
+  const closeChat = (e) => {
+    e.preventDefault();
+    navigate("..", { replace: true });
+  };
+
+  // -----------------------
+  // Socket Sync
+  // -----------------------
   useEffect(() => {
-    // 🔹 Update last message, time & unread count
-    const handleConversationUpdate = ({
+    const update = ({
       conversationId,
       lastMessage,
       updatedAt,
@@ -90,7 +138,6 @@ export default function ChatWindow() {
     }) => {
       queryClient.setQueryData(["conversations"], (old) => {
         if (!old) return old;
-
         return {
           ...old,
           pages: old.pages.map((page) => ({
@@ -105,83 +152,31 @@ export default function ChatWindow() {
       });
     };
 
-    // 🔹 Mark conversation as read (unread = 0)
-    const handleConversationRead = ({ conversationId }) => {
-      queryClient.setQueryData(["conversations"], (old) => {
-        if (!old) return old;
+    socket.on("conversation_update", update);
+    socket.on("conversation_read", ({ conversationId }) =>
+      update({ conversationId, unreadCount: 0 })
+    );
 
-        return {
-          ...old,
-          pages: old.pages.map((page) => ({
-            ...page,
-            conversations: page.conversations.map((c) =>
-              c.conversationId === conversationId ? { ...c, unreadCount: 0 } : c
-            ),
-          })),
-        };
-      });
-    };
-
-    // 🔹 Update partner online / last seen status
-    const handlePresenceUpdate = ({ userId, status, lastSeen }) => {
-      queryClient.setQueryData(["conversations"], (old) => {
-        if (!old) return old;
-
-        return {
-          ...old,
-          pages: old.pages.map((page) => ({
-            ...page,
-            conversations: page.conversations.map((c) =>
-              c.partner._id === userId
-                ? {
-                    ...c,
-                    partner: {
-                      ...c.partner,
-                      isOnline: status === "online" || status === "in_chat",
-                      lastSeen: lastSeen ?? c.partner.lastSeen,
-                    },
-                  }
-                : c
-            ),
-          })),
-        };
-      });
-    };
-
-    // =======================
-    // Register Socket Events
-    // =======================
-    socket.on("conversation_update", handleConversationUpdate);
-    socket.on("conversation_read", handleConversationRead);
-    socket.on("presence_update", handlePresenceUpdate);
-
-    // =======================
-    // Cleanup
-    // =======================
-    return () => {
-      socket.off("conversation_update", handleConversationUpdate);
-      socket.off("conversation_read", handleConversationRead);
-      socket.off("presence_update", handlePresenceUpdate);
-    };
+    return () => socket.off("conversation_update", update);
   }, [queryClient]);
 
-  // =======================
-  // Filters + Sorting
-  // =======================
+  // -----------------------
+  // Filters
+  // -----------------------
   const visibleChats = chats
     .filter((c) =>
       c.partner.fullName.toLowerCase().includes(search.toLowerCase())
     )
-    .filter((c) => !blockedUsers.includes(c.conversationId))
     .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
   // =======================
-  // UI Render
+  // Render
   // =======================
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Left Panel */}
+      {/* LEFT */}
       <div className="w-80 border-r-2 border-border flex flex-col">
+        {/* Search */}
         <div className="p-4">
           <Input
             placeholder="Search chats..."
@@ -190,8 +185,77 @@ export default function ChatWindow() {
           />
         </div>
 
+        {/* Pinned */}
+        {pinnedUsers.length > 0 && (
+          <div className="px-3 pb-1">
+            <div className="text-xs font-semibold mb-2">
+              Pinned ({pinnedUsers.length})
+            </div>
+
+            <div className="flex gap-3 py-2 overflow-x-auto">
+              {pinnedUsers.map((id, i) => {
+                const chat = chats.find((c) => c.conversationId === id);
+                if (!chat) return null;
+
+                return (
+                  <div key={id} className="relative group pt-1 pr-1">
+                    <NavLink
+                      to={`/chat/${id}`}
+                      className="flex flex-col items-center gap-1"
+                    >
+                      <Avatar className="w-12 h-12">
+                        <AvatarImage src={chat.partner.profileImageUrl} />
+                        <AvatarFallback className={getAvatarGradient(i)}>
+                          {chat.partner.fullName[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-xs truncate max-w-[60px]">
+                        {chat.partner.fullName.split(" ")[0]}
+                      </span>
+                    </NavLink>
+
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        togglePin(id);
+                      }}
+                      className="
+                        absolute top-1 right-2
+                        translate-x-1/3 -translate-y-1/3
+                        h-5 w-5 rounded-full
+                        bg-destructive text-white text-xs
+                        flex items-center justify-center
+                        opacity-0 group-hover:opacity-100
+                        transition-opacity
+                      "
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Chats Header */}
+        {visibleChats.length > 0 && (
+          <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+            Chats ({visibleChats.length})
+          </div>
+        )}
+
+        {/* Chat List */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
           {isLoading && <Spinner />}
+
+          {!isLoading && visibleChats.length === 0 && (
+            <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground px-6">
+              <p className="text-sm font-medium mb-1">No chats yet</p>
+              <p className="text-xs">Add a friend to start a conversation</p>
+            </div>
+          )}
 
           {visibleChats.map((chat, i) => (
             <NavLink
@@ -227,13 +291,72 @@ export default function ChatWindow() {
                     {chat.lastMessage?.content || "No messages"}
                   </span>
 
-                  {chat.unreadCount > 0 && (
-                    <span className="bg-green-500 text-white text-xs px-2 rounded-full">
-                      {chat.unreadCount}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {isMuted(chat.conversationId) && (
+                      <VolumeX className="w-4 h-4" />
+                    )}
+                    {chat.unreadCount > 0 && (
+                      <span className="bg-green-500 text-white text-xs px-2 rounded-full">
+                        {chat.unreadCount}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => e.preventDefault()}
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => togglePin(chat.conversationId)}
+                  >
+                    {isPinned(chat.conversationId) ? (
+                      <>
+                        <PinOff size={14} /> Unpin
+                      </>
+                    ) : (
+                      <>
+                        <Pin size={14} /> Pin
+                      </>
+                    )}
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    onClick={() => toggleMute(chat.conversationId)}
+                  >
+                    {isMuted(chat.conversationId) ? (
+                      <>
+                        <Volume size={14} /> Unmute
+                      </>
+                    ) : (
+                      <>
+                        <VolumeX size={14} /> Mute
+                      </>
+                    )}
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    onClick={() => deleteChat(chat.conversationId)}
+                  >
+                    <Trash2 size={14} /> Delete
+                  </DropdownMenuItem>
+
+                  {chatId === chat.conversationId && (
+                    <DropdownMenuItem onClick={(e) => closeChat(e)}>
+                      <X size={14} /> Close chat
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </NavLink>
           ))}
 
@@ -245,7 +368,7 @@ export default function ChatWindow() {
         </div>
       </div>
 
-      {/* Right Panel */}
+      {/* RIGHT */}
       <div className="flex-1">
         {chatId || friendId ? (
           <Outlet
@@ -255,8 +378,6 @@ export default function ChatWindow() {
               setPinnedUsers,
               mutedUsers,
               setMutedUsers,
-              blockedUsers,
-              setBlockedUsers,
             }}
           />
         ) : (
