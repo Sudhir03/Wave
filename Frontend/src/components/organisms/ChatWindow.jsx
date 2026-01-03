@@ -172,7 +172,6 @@ export default function ChatWindow() {
     .filter((c) =>
       c.partner.fullName.toLowerCase().includes(search.toLowerCase())
     )
-    .filter((c) => !blockedUsers.includes(c.conversationId))
     .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
   // =======================

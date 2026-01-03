@@ -62,7 +62,7 @@ exports.getMyConversations = async (req, res) => {
           },
           lastMessage: {
             content: conv.lastMessagePreview || "",
-            timestamp: conv.updatedAt,
+            timestamp: conv.lastMessage.timestamp,
           },
           updatedAt: conv.updatedAt,
           unreadCount: conv.unreadCount?.get(userId) || 0,
