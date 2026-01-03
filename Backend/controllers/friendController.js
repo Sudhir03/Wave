@@ -1,59 +1,33 @@
 const User = require("../models/userModel");
+const Conversation = require("../models/conversationModel");
 const Friendship = require("../models/friendshipModel");
 const catchAsync = require("../utils/catchAsync");
 
-/* =========================
-   Helper: Block Check
-========================= */
-const isBlockedBetween = async (a, b) => {
-  const [u1, u2] = await Promise.all([
-    User.findById(a).select("blockedUsers"),
-    User.findById(b).select("blockedUsers"),
-  ]);
-
-  if (!u1 || !u2) return true;
-
-  return u1.blockedUsers.includes(b) || u2.blockedUsers.includes(a);
-};
-
-/* =========================
-   1. Send Friend Request
-========================= */
+// 1. Send Friend Request
 exports.sendFriendRequest = catchAsync(async (req, res) => {
   const senderId = req.userId;
   const { receiverId } = req.body;
 
   if (!receiverId) {
-    return res.status(400).json({
-      isSuccess: false,
-      message: "receiverId required",
-    });
+    return res
+      .status(400)
+      .json({ isSuccess: false, message: "receiverId required" });
   }
 
   if (senderId.toString() === receiverId) {
-    return res.status(400).json({
-      isSuccess: false,
-      message: "Cannot send request to yourself",
-    });
-  }
-
-  // ❌ Block check
-  const blocked = await isBlockedBetween(senderId, receiverId);
-  if (blocked) {
-    return res.status(403).json({
-      isSuccess: false,
-      message: "You cannot send a request to this user",
-    });
+    return res
+      .status(400)
+      .json({ isSuccess: false, message: "Cannot send request to yourself" });
   }
 
   const receiverExists = await User.findById(receiverId);
   if (!receiverExists) {
-    return res.status(404).json({
-      isSuccess: false,
-      message: "Receiver user not found",
-    });
+    return res
+      .status(404)
+      .json({ isSuccess: false, message: "Receiver user not found" });
   }
 
+  // Check if relationship already exists (pending or accepted)
   const existingRelationship = await Friendship.findOne({
     $or: [
       { user1: senderId, user2: receiverId },
@@ -70,13 +44,20 @@ exports.sendFriendRequest = catchAsync(async (req, res) => {
     }
 
     if (existingRelationship.status === "pending") {
+      const isIncoming =
+        existingRelationship.user2.toString() === senderId.toString();
+
       return res.status(400).json({
         isSuccess: false,
-        message: "Friend request already exists.",
+        message: isIncoming
+          ? "This user has already sent you a request."
+          : "Friend request already sent and pending.",
+        relationship: existingRelationship,
       });
     }
   }
 
+  // Create new Friendship document with 'pending' status
   const request = await Friendship.create({
     user1: senderId,
     user2: receiverId,
@@ -91,13 +72,12 @@ exports.sendFriendRequest = catchAsync(async (req, res) => {
   });
 });
 
-/* =========================
-   2. Cancel Friend Request
-========================= */
+// 2. Cancel Friend Request
 exports.cancelFriendRequest = catchAsync(async (req, res) => {
   const senderId = req.userId;
   const { id: friendshipId } = req.params;
 
+  // Find the pending friendship initiated by the sender
   const friendship = await Friendship.findOne({
     _id: friendshipId,
     user1: senderId,
@@ -105,32 +85,28 @@ exports.cancelFriendRequest = catchAsync(async (req, res) => {
   });
 
   if (!friendship) {
-    return res.status(404).json({
-      isSuccess: false,
-      message: "Pending request not found",
-    });
+    return res
+      .status(404)
+      .json({ isSuccess: false, message: "Pending request not found" });
   }
 
+  // Delete the friendship document
   await Friendship.deleteOne({ _id: friendshipId });
 
-  res.status(200).json({
+  return res.status(200).json({
     isSuccess: true,
     message: "Friend request cancelled",
   });
 });
 
-/* =========================
-   3. Get Sent Requests
-========================= */
+// 3. Get Sent Requests
 exports.getSentRequests = catchAsync(async (req, res) => {
   const senderId = req.userId;
 
-  const me = await User.findById(senderId).select("blockedUsers");
-
+  // Find pending friendships where the current user is user1 (sender)
   const requests = await Friendship.find({
     user1: senderId,
     status: "pending",
-    user2: { $nin: me.blockedUsers },
   }).populate("user2", "fullName username profileImageUrl");
 
   const formatted = requests.map((r) => ({
@@ -141,25 +117,21 @@ exports.getSentRequests = catchAsync(async (req, res) => {
     profileImageUrl: r.user2.profileImageUrl,
   }));
 
-  res.status(200).json({
+  return res.status(200).json({
     isSuccess: true,
     results: formatted.length,
     requests: formatted,
   });
 });
 
-/* =========================
-   4. Get Pending Requests
-========================= */
+// 4. Get Pending Requests
 exports.getPendingRequests = catchAsync(async (req, res) => {
   const { userId } = req;
 
-  const me = await User.findById(userId).select("blockedUsers");
-
+  // Find pending friendships where the current user is user2 (receiver)
   const requests = await Friendship.find({
     user2: userId,
     status: "pending",
-    user1: { $nin: me.blockedUsers },
   }).populate("user1", "fullName username profileImageUrl");
 
   const formattedRequests = requests.map((r) => ({
@@ -170,20 +142,19 @@ exports.getPendingRequests = catchAsync(async (req, res) => {
     profileImageUrl: r.user1.profileImageUrl,
   }));
 
-  res.status(200).json({
+  return res.status(200).json({
     isSuccess: true,
     results: formattedRequests.length,
     requests: formattedRequests,
   });
 });
 
-/* =========================
-   5. Accept Friend Request
-========================= */
+// 5. Accept Friend Request
 exports.acceptFriendRequest = catchAsync(async (req, res) => {
   const receiverId = req.userId;
   const { id: friendshipId } = req.params;
 
+  // Find the pending friendship where the current user is the intended receiver
   const friendship = await Friendship.findOne({
     _id: friendshipId,
     user2: receiverId,
@@ -191,26 +162,28 @@ exports.acceptFriendRequest = catchAsync(async (req, res) => {
   });
 
   if (!friendship) {
-    return res.status(404).json({
+    return res
+      .status(404)
+      .json({ isSuccess: false, message: "Pending request not found" });
+  }
+
+  const senderId = friendship.user1;
+
+  // Optional safety check
+  if (senderId.toString() === receiverId.toString()) {
+    return res.status(400).json({
       isSuccess: false,
-      message: "Pending request not found",
+      message: "Cannot accept a friend request from yourself",
     });
   }
 
-  // ❌ Block check
-  const blocked = await isBlockedBetween(receiverId, friendship.user1);
-  if (blocked) {
-    return res.status(403).json({
-      isSuccess: false,
-      message: "Cannot accept request from blocked user",
-    });
-  }
-
+  // 2. Update Friendship status to 'accepted'
   await Friendship.updateOne({ _id: friendshipId }, { status: "accepted" });
 
+  // 3. Add the Friendship ID to both Users' 'friendships' arrays
   await Promise.all([
     User.updateOne(
-      { _id: friendship.user1 },
+      { _id: senderId },
       { $addToSet: { friendships: friendshipId } }
     ),
     User.updateOne(
@@ -219,19 +192,19 @@ exports.acceptFriendRequest = catchAsync(async (req, res) => {
     ),
   ]);
 
-  res.status(200).json({
+  return res.status(200).json({
     isSuccess: true,
     message: "Friend request accepted",
+    friendshipId: friendshipId,
   });
 });
 
-/* =========================
-   6. Decline Friend Request
-========================= */
+// 6. Decline Friend Request
 exports.declineFriendRequest = catchAsync(async (req, res) => {
   const { id: friendshipId } = req.params;
   const receiverId = req.userId;
 
+  // Find the pending friendship intended for the receiver
   const friendship = await Friendship.findOne({
     _id: friendshipId,
     user2: receiverId,
@@ -239,76 +212,87 @@ exports.declineFriendRequest = catchAsync(async (req, res) => {
   });
 
   if (!friendship) {
-    return res.status(404).json({
-      isSuccess: false,
-      message: "Pending request not found",
-    });
+    return res
+      .status(404)
+      .json({ isSuccess: false, message: "Pending request not found" });
   }
 
+  // Delete the friendship document (decline means permanent removal)
   await Friendship.deleteOne({ _id: friendshipId });
 
-  res.status(200).json({
+  return res.status(200).json({
     isSuccess: true,
     message: "Friend request declined",
   });
 });
 
-/* =========================
-   7. Get Friends List
-========================= */
+// 7. Get Friends List
 exports.getMyFriends = catchAsync(async (req, res) => {
+  // Fetches accepted friends by populating the User's friendship array.
   const { userId } = req;
 
-  const user = await User.findById(userId)
-    .select("blockedUsers friendships")
-    .populate({
-      path: "friendships",
-      match: { status: "accepted" },
-      populate: [
-        { path: "user1", select: "fullName username profileImageUrl" },
-        { path: "user2", select: "fullName username profileImageUrl" },
-      ],
-    });
+  const user = await User.findById(userId).populate({
+    path: "friendships",
+    match: { status: "accepted" },
+
+    select: "user1 user2 conversationId",
+
+    populate: [
+      {
+        path: "user1",
+        model: "User",
+        select: "fullName username profileImageUrl",
+      },
+      {
+        path: "user2",
+        model: "User",
+        select: "fullName username profileImageUrl",
+      },
+      {
+        path: "conversationId",
+        select: "_id",
+      },
+    ],
+  });
 
   if (!user) {
-    return res.status(404).json({
-      isSuccess: false,
-      message: "User not found",
-    });
+    return res
+      .status(404)
+      .json({ isSuccess: false, message: "User not found" });
   }
 
-  const blockedSet = new Set(user.blockedUsers.map(String));
+  const friendsList = user.friendships.map((friendship) => {
+    const friend =
+      friendship.user1._id.toString() === userId.toString()
+        ? friendship.user2
+        : friendship.user1;
 
-  const friends = user.friendships
-    .map((f) => {
-      const friend = f.user1._id.toString() === userId ? f.user2 : f.user1;
+    const convId = friendship.conversationId
+      ? friendship.conversationId._id
+      : null;
 
-      if (blockedSet.has(friend._id.toString())) return null;
+    return {
+      _id: friend._id,
+      fullName: friend.fullName,
+      username: friend.username,
+      profileImageUrl: friend.profileImageUrl,
+      conversationId: convId,
+    };
+  });
 
-      return {
-        _id: friend._id,
-        fullName: friend.fullName,
-        username: friend.username,
-        profileImageUrl: friend.profileImageUrl,
-        conversationId: f.conversationId || null,
-      };
-    })
-    .filter(Boolean);
-
-  res.status(200).json({
+  return res.status(200).json({
     isSuccess: true,
-    results: friends.length,
-    friends,
+    results: friendsList.length,
+    friends: friendsList,
   });
 });
 
-/* =========================
-   8. Remove Friend
-========================= */
+// 8. Remove Friend
 exports.removeFriend = catchAsync(async (req, res) => {
   const userId = req.userId;
   const { id: friendId } = req.params;
 
+  // Prevent removing yourself
   if (userId.toString() === friendId.toString()) {
     return res.status(400).json({
       isSuccess: false,
@@ -316,6 +300,7 @@ exports.removeFriend = catchAsync(async (req, res) => {
     });
   }
 
+  // 1. Find the Friendship Document
   const friendship = await Friendship.findOne({
     status: "accepted",
     $or: [
@@ -331,17 +316,18 @@ exports.removeFriend = catchAsync(async (req, res) => {
     });
   }
 
-  await Friendship.deleteOne({ _id: friendship._id });
+  const friendshipId = friendship._id;
 
+  // 2. Delete the Friendship document
+  await Friendship.deleteOne({ _id: friendshipId });
+
+  // 3. Remove the Friendship ID from both Users' 'friendships' arrays
   await Promise.all([
-    User.updateOne({ _id: userId }, { $pull: { friendships: friendship._id } }),
-    User.updateOne(
-      { _id: friendId },
-      { $pull: { friendships: friendship._id } }
-    ),
+    User.updateOne({ _id: userId }, { $pull: { friendships: friendshipId } }),
+    User.updateOne({ _id: friendId }, { $pull: { friendships: friendshipId } }),
   ]);
 
-  res.status(200).json({
+  return res.status(200).json({
     isSuccess: true,
     message: "Friend removed successfully",
   });

@@ -3,7 +3,6 @@
 // =======================
 const Conversation = require("../models/conversationModel");
 const Message = require("../models/messageModel");
-const User = require("../models/userModel");
 const catchAsync = require("../utils/catchAsync");
 const uploadToCloudinary = require("../utils/uploadToCloudinary");
 
@@ -15,18 +14,6 @@ const { getPresence } = require("../redis/presence");
 const getMediaPreview = require("../utils/getMediaPreview");
 
 /* =========================
-   BLOCK HELPER (NEW)
-========================= */
-const isBlockedBetween = async (a, b) => {
-  const users = await User.find({ _id: { $in: [a, b] } }).select(
-    "blockedUsers"
-  );
-  if (users.length !== 2) return true;
-
-  return users[0].blockedUsers.includes(b) || users[1].blockedUsers.includes(a);
-};
-
-/* =========================
    GET MY CONVERSATIONS
 ========================= */
 exports.getMyConversations = async (req, res) => {
@@ -34,36 +21,34 @@ exports.getMyConversations = async (req, res) => {
     const userId = req.userId;
     const { limit = 10, cursor } = req.query;
 
-    const me = await User.findById(userId).select("blockedUsers");
-
-    const query = {
-      participants: userId,
-      participants: { $nin: me.blockedUsers },
-    };
-
+    const query = { participants: userId };
     if (cursor) query.updatedAt = { $lt: new Date(cursor) };
 
+    // =======================
+    // Fetch Conversations
+    // =======================
     const conversations = await Conversation.find(query)
       .sort({ updatedAt: -1 })
       .limit(Number(limit))
       .populate(
         "participants",
-        "fullName username profileImageUrl isOnline lastSeen blockedUsers"
+        "fullName username profileImageUrl isOnline lastSeen"
       )
       .populate({
         path: "lastMessage",
         select: "content senderId timestamp",
       });
 
+    // =======================
+    // Format Conversations
+    // =======================
     const formatted = await Promise.all(
       conversations.map(async (conv) => {
         const partner = conv.participants.find(
           (p) => p._id.toString() !== userId
         );
 
-        // ⛔ Partner blocked me
-        if (partner.blockedUsers?.includes(userId)) return null;
-
+        // Presence from Redis
         const presence = await getPresence(partner._id.toString());
 
         return {
@@ -85,14 +70,15 @@ exports.getMyConversations = async (req, res) => {
       })
     );
 
-    const cleanFormatted = formatted.filter(Boolean);
-
+    // =======================
+    // Pagination Cursor
+    // =======================
     const nextCursor =
       conversations.length === Number(limit)
         ? conversations[conversations.length - 1].updatedAt
         : null;
 
-    res.status(200).json({ conversations: cleanFormatted, nextCursor });
+    res.status(200).json({ conversations: formatted, nextCursor });
   } catch (error) {
     res.status(500).json({ message: "Failed to load conversations" });
   }
@@ -102,26 +88,20 @@ exports.getMyConversations = async (req, res) => {
    GET MESSAGES
 ========================= */
 exports.getMessages = async (req, res) => {
+  // =======================
+  // Extract Params
+  // =======================
   const { conversationId } = req.params;
   const { cursor, limit = 10 } = req.query;
   const userId = req.userId;
 
   const conversation = await Conversation.findById(conversationId);
-  if (!conversation)
+  if (!conversation) {
     return res.status(404).json({ message: "Conversation not found" });
+  }
 
-  if (!conversation.participants.some((p) => p.toString() === userId))
+  if (!conversation.participants.some((p) => p.toString() === userId)) {
     return res.status(403).json({ message: "Access denied" });
-
-  const receiverId = conversation.participants.find(
-    (p) => p.toString() !== userId
-  );
-
-  const blocked = await isBlockedBetween(userId, receiverId);
-  if (blocked) {
-    return res.status(403).json({
-      message: "You cannot access messages in this conversation",
-    });
   }
 
   const query = { conversationId };
@@ -132,6 +112,9 @@ exports.getMessages = async (req, res) => {
     .limit(Number(limit) + 1)
     .populate("sender", "fullName profileImageUrl");
 
+  // =======================
+  // Pagination Handling
+  // =======================
   const hasNextPage = messages.length > limit;
   if (hasNextPage) messages.pop();
 
@@ -145,29 +128,28 @@ exports.getMessages = async (req, res) => {
 };
 
 /* =========================
-   SEND TEXT MESSAGE
+   SEND TEXT MESSAGE (FIXED)
 ========================= */
 exports.sendTextMessage = catchAsync(async (req, res) => {
   const { userId } = req;
   const { conversationId, content, clientId } = req.body;
 
-  if (!content?.trim())
+  if (!content?.trim()) {
     return res.status(400).json({ message: "Text content required" });
+  }
 
   const conversation = await Conversation.findById(conversationId);
-  if (!conversation)
+  if (!conversation) {
     return res.status(404).json({ message: "Conversation not found" });
+  }
 
   const receiverId = conversation.participants.find(
     (id) => id.toString() !== userId.toString()
   );
 
-  const blocked = await isBlockedBetween(userId, receiverId);
-  if (blocked)
-    return res.status(403).json({
-      message: "You cannot message this user",
-    });
-
+  /* =========================
+     Presence → status
+  ========================= */
   const presence = await getPresence(receiverId);
   let status = "sent";
 
@@ -177,9 +159,13 @@ exports.sendTextMessage = catchAsync(async (req, res) => {
   );
 
   if (isReceiverReading) status = "read";
-  else if (presence?.status === "online" || presence?.status === "in_chat")
+  else if (presence?.status === "online" || presence?.status === "in_chat") {
     status = "delivered";
+  }
 
+  /* =========================
+     SAVE MESSAGE
+  ========================= */
   const message = await Message.create({
     conversationId,
     sender: userId,
@@ -194,29 +180,42 @@ exports.sendTextMessage = catchAsync(async (req, res) => {
     "fullName profileImageUrl"
   );
 
+  /* =========================
+     UPDATE CONVERSATION
+  ========================= */
   const update = {
     lastMessage: message._id,
-    lastMessagePreview: content,
+    lastMessagePreview: content, // ✅ ADD THIS
     updatedAt: message.timestamp,
     $set: { [`unreadCount.${userId}`]: 0 },
   };
 
-  if (!isReceiverReading) update.$inc = { [`unreadCount.${receiverId}`]: 1 };
+  if (!isReceiverReading) {
+    update.$inc = { [`unreadCount.${receiverId}`]: 1 };
+  }
 
   await Conversation.findByIdAndUpdate(conversationId, update);
 
+  /* =========================
+     FETCH ABSOLUTE UNREAD
+  ========================= */
   const updatedConversation = await Conversation.findById(conversationId);
   const receiverUnread =
     updatedConversation.unreadCount.get(receiverId.toString()) || 0;
 
+  /* =========================
+     SOCKET EMITS
+  ========================= */
   const io = getIO();
 
+  // Chat screen (real-time message)
   io.to(conversationId.toString()).emit("receive_message", {
     ...populatedMessage.toObject(),
     clientId,
     status,
   });
 
+  // Receiver chat list
   io.to(receiverId.toString()).emit("conversation_update", {
     conversationId,
     lastMessage: {
@@ -227,6 +226,7 @@ exports.sendTextMessage = catchAsync(async (req, res) => {
     unreadCount: receiverUnread,
   });
 
+  // Sender chat list
   io.to(userId.toString()).emit("conversation_update", {
     conversationId,
     lastMessage: {
@@ -245,14 +245,18 @@ exports.sendTextMessage = catchAsync(async (req, res) => {
 
 /* =========================
    SEND MEDIA MESSAGE
-========================= */
+   =========================*/
 exports.sendMediaMessage = catchAsync(async (req, res) => {
   const { userId } = req;
   const { conversationId, clientId } = req.body;
 
-  if (!req.files || req.files.length === 0)
+  if (!req.files || req.files.length === 0) {
     return res.status(400).json({ message: "Media files required" });
+  }
 
+  // =======================
+  // Validate Conversation
+  // =======================
   const conversation = await Conversation.findById(conversationId);
   if (!conversation)
     return res.status(404).json({ message: "Conversation not found" });
@@ -261,12 +265,6 @@ exports.sendMediaMessage = catchAsync(async (req, res) => {
     (id) => id.toString() !== userId.toString()
   );
 
-  const blocked = await isBlockedBetween(userId, receiverId);
-  if (blocked)
-    return res.status(403).json({
-      message: "You cannot send media to this user",
-    });
-
   const media = await Promise.all(
     req.files.map(async (file) => {
       let type = "document";
@@ -274,16 +272,27 @@ exports.sendMediaMessage = catchAsync(async (req, res) => {
       let thumbnail = null;
       let isVoice = false;
 
+      // IMAGE
       if (file.mimetype.startsWith("image")) {
         type = "image";
         resourceType = "image";
-      } else if (file.mimetype.startsWith("video")) {
+      }
+
+      // VIDEO
+      else if (file.mimetype.startsWith("video")) {
         type = "video";
         resourceType = "video";
-      } else if (file.mimetype.startsWith("audio")) {
+      }
+
+      // AUDIO / VOICE
+      else if (file.mimetype.startsWith("audio")) {
         type = "audio";
-        resourceType = "video";
-        if (file.originalname.startsWith("voice-")) isVoice = true;
+        resourceType = "video"; // cloudinary requirement
+
+        // 🔥 VOICE DETECTION (MIC RECORDED)
+        if (file.originalname.startsWith("voice-")) {
+          isVoice = true;
+        }
       }
 
       const uploaded = await uploadToCloudinary({
@@ -292,25 +301,32 @@ exports.sendMediaMessage = catchAsync(async (req, res) => {
         resourceType,
       });
 
+      // VIDEO THUMBNAIL (Cloudinary)
       if (type === "video") {
         thumbnail = uploaded.secure_url
           .replace("/video/upload/", "/video/upload/so_1,f_jpg,q_auto,w_400/")
           .replace(".mp4", ".jpg");
       }
 
-      if (type === "image") thumbnail = uploaded.secure_url;
+      // IMAGE THUMBNAIL = IMAGE ITSELF
+      if (type === "image") {
+        thumbnail = uploaded.secure_url;
+      }
 
       return {
-        type,
+        type, // image | video | audio | document
         isVoice,
         url: uploaded.secure_url,
-        thumbnail,
+        thumbnail, // image/video only
         fileName: file.originalname,
-        fileSize: uploaded.bytes,
+        fileSize: uploaded.bytes, // Number (bytes)
       };
     })
   );
 
+  /* =========================
+     Presence → status
+  ========================= */
   const presence = await getPresence(receiverId);
   let status = "sent";
 
@@ -323,6 +339,9 @@ exports.sendMediaMessage = catchAsync(async (req, res) => {
   else if (presence?.status === "online" || presence?.status === "in_chat")
     status = "delivered";
 
+  /* ----------------------
+     SAVE MESSAGE
+  ---------------------- */
   const message = await Message.create({
     conversationId,
     sender: userId,
@@ -337,6 +356,10 @@ exports.sendMediaMessage = catchAsync(async (req, res) => {
     "fullName profileImageUrl"
   );
 
+  /* ----------------------
+     UPDATE CONVERSATION
+  ---------------------- */
+
   const mediaPreview = getMediaPreview(media);
 
   await Conversation.findByIdAndUpdate(conversationId, {
@@ -349,38 +372,52 @@ exports.sendMediaMessage = catchAsync(async (req, res) => {
       : { $inc: { [`unreadCount.${receiverId}`]: 1 } }),
   });
 
+  /* ----------------------
+     FETCH ABSOLUTE UNREAD
+  ---------------------- */
   const updatedConversation = await Conversation.findById(conversationId);
   const receiverUnread =
     updatedConversation.unreadCount.get(receiverId.toString()) || 0;
 
+  /* ----------------------
+     SOCKET EMITS
+  ---------------------- */
   const io = getIO();
 
+  // Chat screen (real-time message)
   io.to(conversationId.toString()).emit("receive_message", {
     ...populatedMessage.toObject(),
     clientId,
     status,
   });
 
+  // Receiver chat list
   io.to(receiverId.toString()).emit("conversation_update", {
     conversationId,
     lastMessage: {
-      content: mediaPreview,
+      content: mediaPreview, // ✅ FIX
       timestamp: populatedMessage.timestamp,
     },
+
     updatedAt: populatedMessage.timestamp,
     unreadCount: receiverUnread,
   });
 
+  // Sender chat list
   io.to(userId.toString()).emit("conversation_update", {
     conversationId,
     lastMessage: {
       content: mediaPreview,
       timestamp: populatedMessage.timestamp,
     },
+
     updatedAt: populatedMessage.timestamp,
     unreadCount: 0,
   });
 
+  // =======================
+  // Response
+  // =======================
   res.status(201).json({
     isSuccess: true,
     sentMessage: populatedMessage,
