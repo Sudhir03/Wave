@@ -30,7 +30,7 @@ import { formatLastSeen } from "@/lib/utils";
 /* =========================
    Icons
 ========================= */
-import { BellOff, Pin, PinOff, Send, UserX } from "lucide-react";
+import { BellOff, Pin, PinOff, Send } from "lucide-react";
 
 /* =========================
    Socket
@@ -43,16 +43,7 @@ export default function ChatDetail() {
   /* =========================
      CONTEXT
   ========================= */
-  const {
-    activeChat,
-    pinnedUsers,
-    addPin,
-    removePin,
-    mutedUsers,
-    toggleMute,
-    blockedUsers,
-    toggleBlock,
-  } = useOutletContext();
+  const { activeChat } = useOutletContext();
 
   const queryClient = useQueryClient();
   const conversations =
@@ -117,9 +108,9 @@ export default function ChatDetail() {
             <span className="font-semibold truncate max-w-48">
               {chat.fullName}
             </span>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-accent">
               {isTyping ? (
-                <span className="italic text-primary">typing...</span>
+                <span className="italic">typing...</span>
               ) : chat.isOnline ? (
                 "Online"
               ) : (
@@ -135,42 +126,37 @@ export default function ChatDetail() {
           <CallPopover type="video" />
 
           <MoreOptionsPopover
-            options={[
-              {
-                label: pinnedUsers.some(
-                  (p) => p.conversationId === activeChat.conversationId
-                )
-                  ? "Unpin"
-                  : "Pin",
-                icon: {
-                  component: pinnedUsers.some(
-                    (p) => p.conversationId === activeChat.conversationId
-                  )
-                    ? PinOff
-                    : Pin,
-                },
-                onClick: () =>
-                  pinnedUsers.some(
-                    (p) => p.conversationId === activeChat.conversationId
-                  )
-                    ? removePin(activeChat.conversationId)
-                    : addPin(activeChat),
-              },
-              {
-                label: mutedUsers.includes(activeChat.conversationId)
-                  ? "Unmute"
-                  : "Mute",
-                icon: { component: BellOff },
-                onClick: () => toggleMute(activeChat),
-              },
-              {
-                label: blockedUsers.includes(activeChat.conversationId)
-                  ? "Unblock"
-                  : "Block",
-                icon: { component: UserX, props: { color: "red" } },
-                onClick: () => toggleBlock(activeChat),
-              },
-            ]}
+            options={
+              [
+                // {
+                //   label: pinnedUsers.some(
+                //     (p) => p.conversationId === activeChat.conversationId
+                //   )
+                //     ? "Unpin"
+                //     : "Pin",
+                //   icon: {
+                //     component: pinnedUsers.some(
+                //       (p) => p.conversationId === activeChat.conversationId
+                //     )
+                //       ? PinOff
+                //       : Pin,
+                //   },
+                //   onClick: () =>
+                //     pinnedUsers.some(
+                //       (p) => p.conversationId === activeChat.conversationId
+                //     )
+                //       ? removePin(activeChat.conversationId)
+                //       : addPin(activeChat),
+                // },
+                // {
+                //   label: mutedUsers.includes(activeChat.conversationId)
+                //     ? "Unmute"
+                //     : "Mute",
+                //   icon: { component: BellOff },
+                //   onClick: () => toggleMute(activeChat),
+                // },
+              ]
+            }
           />
         </div>
       </div>

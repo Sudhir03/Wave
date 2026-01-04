@@ -19,6 +19,8 @@ const userRoutes = require("./routes/userRoutes");
 const friendRoutes = require("./routes/friendRoutes");
 const chatRoutes = require("./routes/chatRoutes");
 const conversationRoutes = require("./routes/conversationRoutes");
+const conversationPreferenceRoutes = require("./routes/conversationPreferenceRoutes");
+const blockRoutes = require("./routes/blockRoutes");
 
 const app = express();
 
@@ -35,7 +37,7 @@ const limiter = rateLimit({
   max: 200,
   message: "Too many requests, please try again later",
 });
-app.use("/api", limiter);
+// app.use("/api", limiter);
 
 // =======================
 // CORS CONFIG (FIXED)
@@ -88,6 +90,8 @@ app.use("/api/users", userRoutes);
 app.use("/api/friends", friendRoutes);
 app.use("/api/chats", chatRoutes);
 app.use("/api/conversations", conversationRoutes);
+app.use("/api/conversation-preferences", conversationPreferenceRoutes);
+app.use("/api/block", blockRoutes);
 
 // =======================
 // 404 Handler

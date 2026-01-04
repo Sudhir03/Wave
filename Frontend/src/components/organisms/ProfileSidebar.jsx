@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { Button } from "../atoms/Button";
-import { User, Bell, Sliders, HelpCircle, LogOut } from "lucide-react";
+import { User, Bell, Sliders, HelpCircle, LogOut, Ban } from "lucide-react";
 import ConfirmationModal from "../molecules/ConfirmationModal";
 import { useClerk } from "@clerk/clerk-react";
 
@@ -25,6 +25,11 @@ function ProfileSidebar() {
       to: "personalization",
       text: "Personalization",
       icon: <Sliders className="w-4 h-4" />,
+    },
+    {
+      to: "blocked",
+      text: "Blocked Users",
+      icon: <Ban className="w-4 h-4" />,
     },
     { to: "help", text: "Help", icon: <HelpCircle className="w-4 h-4" /> },
   ];

@@ -19,7 +19,7 @@ import "react-toastify/dist/ReactToastify.css";
 // =======================
 // Imports – Data & State
 // =======================
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getMyProfile } from "./api/users";
 
 // =======================
@@ -33,7 +33,6 @@ function App() {
   // Auth & Query Setup
   // =======================
   const { getToken } = useAuth();
-  const queryClient = useQueryClient();
 
   // =======================
   // Fetch Logged-In User
@@ -75,14 +74,6 @@ function App() {
       socket.disconnect();
     };
   }, [user?._id]);
-
-  useEffect(() => {
-    const showToken = async () => {
-      const token = await getToken({ template: "backend-api" });
-      console.log("JWT Token:", token);
-    };
-    showToken();
-  }, [getToken]);
 
   return (
     <>

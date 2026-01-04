@@ -22,6 +22,7 @@ import FriendsPanel from "@/components/organisms/FriendsPanel";
 
 // Calls
 import { CallHistoryPage } from "@/components/templates/CallHistoryPage";
+import BlockedUsersList from "@/pages/BlockedUsersList";
 
 const router = createBrowserRouter([
   {
@@ -45,6 +46,7 @@ const router = createBrowserRouter([
           { index: true, element: <Account /> },
           { path: "notification", element: <Notification /> },
           { path: "personalization", element: <Personalization /> },
+          { path: "blocked", element: <BlockedUsersList /> },
           { path: "help", element: <Help /> },
         ],
       },

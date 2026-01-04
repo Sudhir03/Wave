@@ -60,6 +60,14 @@ const userSchema = new mongoose.Schema({
   clerkUpdatedAt: Date,
 
   friendships: [{ type: mongoose.Schema.Types.ObjectId, ref: "Friendship" }],
+
+  blockedUsers: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
+  ],
 });
 
 module.exports = mongoose.model("User", userSchema);
