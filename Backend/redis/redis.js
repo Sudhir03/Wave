@@ -1,30 +1,24 @@
 const { createClient } = require("redis");
-const logger = require("../utils/logger");
+const dotenv = require("dotenv");
+
+dotenv.config();
 
 const redis = createClient({
   url: process.env.REDIS_URL,
 });
 
-redis.on("error", (err) => {
-  logger.error(`❌ Redis Error: ${err.message}`);
+redis.on("error", function (err) {
+  console.error("Redis Client Error", err);
 });
 
-redis.on("connect", () => {
-  logger.info("🔌 Redis socket connected");
-});
-
-redis.on("ready", () => {
-  logger.info("✅ Redis is ready to use");
-});
-
-(async () => {
+const connectRedis = async () => {
   try {
     if (!redis.isOpen) {
       await redis.connect();
     }
   } catch (err) {
-    logger.error(`❌ Failed to connect Redis: ${err.message}`);
+    console.error("❌ Redis Connection Failed:", err);
   }
-})();
+};
 
-module.exports = redis;
+module.exports = { redis, connectRedis };
