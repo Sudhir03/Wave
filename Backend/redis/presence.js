@@ -2,7 +2,7 @@
 // Imports – Logger, Redis, Models
 // =======================
 const logger = require("../utils/logger");
-const redis = require("./redis");
+const { redis } = require("./redis");
 const User = require("../models/userModel");
 
 // =======================
@@ -15,7 +15,7 @@ async function updateLastSeenInDB(userId, timestamp) {
       { $set: { lastSeen: new Date(timestamp) } }
     );
   } catch (err) {
-    console.error("❌ Failed to update lastSeen in DB", err);
+    logger.error("❌ Failed to update lastSeen in DB", err);
   }
 }
 
@@ -48,7 +48,7 @@ async function updatePresence(userId, data = {}) {
       redis.expire(key, PRESENCE_TTL),
     ]);
   } catch (error) {
-    console.error("❌ Failed to update presence in Redis", error);
+    logger.error("❌ Failed to update presence in Redis", error);
   }
 }
 
