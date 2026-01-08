@@ -19,6 +19,7 @@ const {
 const Message = require("../models/messageModel");
 const conversationModel = require("../models/conversationModel");
 const logger = require("../utils/logger");
+const registerWebRTCHandlers = require("./webrtc");
 
 // =======================
 // Socket Instance
@@ -197,6 +198,11 @@ const socketServer = (server) => {
         });
       }
     });
+
+    // =======================
+    // WebRTC (register handlers)
+    // =======================
+    registerWebRTCHandlers(io, socket);
   });
 };
 

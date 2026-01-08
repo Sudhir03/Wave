@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "../atoms/Avatar";
 import { Phone, Video, XCircle } from "lucide-react";
 import { useState } from "react";
 import { getAvatarGradient } from "@/lib/colorGradient";
-import { VideoCallWindow } from "../organisms/VideoCallWindow";
+// import { VideoCallWindow } from "../organisms/VideoCallWindow";
 import { NormalCallCard } from "../organisms/NormalCallCard";
 
 const callHistory = {
@@ -142,14 +142,14 @@ export const CallHistoryPage = () => {
                 onEnd={closeModal}
               />
             )}
-            {callType === "video" && (
+            {/* {callType === "video" && (
               <VideoCallWindow
                 callerName="Sarah Connor"
                 localVideoSrc="https://www.w3schools.com/html/mov_bbb.mp4"
                 remoteVideoSrc="https://www.w3schools.com/html/movie.mp4"
                 onEnd={closeModal}
               />
-            )}
+            )} */}
           </div>
         </div>
       )}

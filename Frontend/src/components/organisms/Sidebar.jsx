@@ -23,7 +23,7 @@ export default function Sidebar() {
 
   return (
     <div className="relative">
-      <div className="flex flex-col items-center w-20 pt-4 space-y-6 pb-4 bg-card text-card-foreground relative h-full z-50">
+      <div className="flex flex-col items-center w-20 pt-4 space-y-6 pb-4 bg-card text-card-foreground relative h-full">
         {/* Top Logo */}
         <Logo />
 

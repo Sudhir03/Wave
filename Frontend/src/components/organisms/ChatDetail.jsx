@@ -30,7 +30,7 @@ import { formatLastSeen } from "@/lib/utils";
 /* =========================
    Icons
 ========================= */
-import { BellOff, Pin, PinOff, Send } from "lucide-react";
+import { Send } from "lucide-react";
 
 /* =========================
    Socket
@@ -122,8 +122,8 @@ export default function ChatDetail() {
 
         <div className="flex items-center gap-1">
           <ChatSearch messages={messages} />
-          <CallPopover type="audio" />
-          <CallPopover type="video" />
+          <CallPopover type="audio" peer={chat} />
+          <CallPopover type="video" peer={chat} />
 
           <MoreOptionsPopover
             options={

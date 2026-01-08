@@ -4,6 +4,8 @@ import { ClerkProvider } from "@clerk/clerk-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "./index.css";
 import App from "./App.jsx";
+import { CallProvider } from "./features/webrtc/CallContext";
+import { CallScreen } from "./components/organisms/CallScreen";
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
@@ -19,7 +21,10 @@ createRoot(document.getElementById("root")).render(
   <StrictMode>
     <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
       <QueryClientProvider client={queryClient}>
-        <App />
+        <CallProvider>
+          <CallScreen />
+          <App />
+        </CallProvider>
       </QueryClientProvider>
     </ClerkProvider>
   </StrictMode>
