@@ -58,8 +58,6 @@ export function useWebRTCInternal() {
 
     const pc = new RTCPeerConnection(ICE_SERVERS);
 
-    pc.addTransceiver("audio", { direction: "sendrecv" });
-
     pc.onicecandidate = (e) => {
       if (e.candidate) {
         socket.emit("webrtc_ice_candidate", {
@@ -132,9 +130,9 @@ export function useWebRTCInternal() {
       );
 
       // 🔹 Audio-only safety
-      // if (!video) {
-      //   localStreamRef.current.getVideoTracks().forEach((t) => t.stop());
-      // }
+      if (!video) {
+        localStreamRef.current.getVideoTracks().forEach((t) => t.stop());
+      }
 
       setHasLocalStream(true);
 
