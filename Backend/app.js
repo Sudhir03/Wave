@@ -42,7 +42,10 @@ const limiter = rateLimit({
 // =======================
 // CORS CONFIG (FIXED)
 // =======================
-const allowedOrigins = [process.env.FRONTEND_URL, "http://10.190.12.207:5173"];
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_PHONE_URL,
+];
 app.use(
   cors({
     origin: (origin, callback) => {
