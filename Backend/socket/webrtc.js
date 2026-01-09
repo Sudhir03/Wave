@@ -1,65 +1,99 @@
 // =======================
-// WebRTC + Presence Handlers
+// Imports – Presence (Redis)
 // =======================
-
-// ⚠️ Assume: redis/presence already maintains online users
-// Example helper (adjust as per your redis logic)
 const { isUserOnline } = require("../redis/presence");
-// ↑ agar function ka naam different ho, wahi use karna
 
+// =======================
+// WebRTC Signaling Handlers
+// =======================
 module.exports = function registerWebRTCHandlers(io, socket) {
   // =======================
   // CHECK CALLEE ONLINE STATUS
   // =======================
-  socket.on("check_user_online", async ({ targetUserId }) => {
+  socket.on("check_user_online", async ({ calleeId }) => {
     try {
-      const online = await isUserOnline(targetUserId);
-
-      console.log(
-        `📡 [Presence] Callee ${targetUserId} is`,
-        online ? "ONLINE" : "OFFLINE"
-      );
+      const online = await isUserOnline(calleeId);
 
       socket.emit("callee_status", {
-        userId: targetUserId,
+        calleeId,
         online,
       });
     } catch (err) {
-      console.log("❌ [Presence] Error checking user:", err.message);
-
       socket.emit("callee_status", {
-        userId: targetUserId,
+        calleeId,
         online: false,
       });
     }
   });
 
   // =======================
-  // WebRTC Signaling (TEST MODE)
+  // WEBRTC OFFER
   // =======================
+  socket.on("webrtc_offer", async ({ calleeId, offer, callType, caller }) => {
+    if (!socket.userId) return;
 
-  socket.on("webrtc_offer", ({ offer, callType }) => {
-    console.log("📞 [WebRTC] Offer received from:", socket.id);
-    socket.broadcast.emit("webrtc_offer", { offer, callType });
+    const online = await isUserOnline(calleeId);
+    if (!online) {
+      socket.emit("callee_status", { online: false });
+      return;
+    }
+
+    io.to(calleeId).emit("webrtc_offer", {
+      caller, // ✅ forward caller data
+      offer,
+      callType,
+    });
   });
 
-  socket.on("webrtc_answer", ({ answer }) => {
-    console.log("✅ [WebRTC] Answer received from:", socket.id);
-    socket.broadcast.emit("webrtc_answer", { answer });
+  // =======================
+  // WEBRTC ANSWER
+  // =======================
+  socket.on("webrtc_answer", async ({ callerId, answer }) => {
+    if (!socket.userId) return;
+
+    const online = await isUserOnline(callerId);
+    if (!online) {
+      socket.emit("callee_status", { online: false });
+      return;
+    }
+
+    io.to(callerId).emit("webrtc_answer", {
+      answer,
+    });
   });
 
-  socket.on("webrtc_ice_candidate", ({ candidate }) => {
-    console.log("🧊 [WebRTC] ICE candidate from:", socket.id);
-    socket.broadcast.emit("webrtc_ice_candidate", { candidate });
+  // =======================
+  // WEBRTC ICE CANDIDATE
+  // =======================
+  socket.on("webrtc_ice_candidate", async ({ targetUserId, candidate }) => {
+    if (!socket.userId) return;
+
+    const online = await isUserOnline(targetUserId);
+    if (!online) {
+      socket.emit("callee_status", { online: false });
+      return;
+    }
+
+    io.to(targetUserId).emit("webrtc_ice_candidate", {
+      candidate,
+    });
   });
 
-  socket.on("webrtc_call_end", () => {
-    console.log("📴 [WebRTC] Call ended by:", socket.id);
-    socket.broadcast.emit("webrtc_call_end");
+  // =======================
+  // WEBRTC CALL END
+  // =======================
+  socket.on("webrtc_call_end", ({ targetUserId }) => {
+    if (!socket.userId) return;
+
+    io.to(targetUserId).emit("webrtc_call_end");
   });
 
-  socket.on("webrtc_call_declined", () => {
-    console.log("❌ [WebRTC] Call declined by:", socket.id);
-    socket.broadcast.emit("webrtc_call_declined");
+  // =======================
+  // WEBRTC CALL DECLINED
+  // =======================
+  socket.on("webrtc_call_declined", ({ callerId }) => {
+    if (!socket.userId) return;
+
+    io.to(callerId).emit("webrtc_call_declined");
   });
 };

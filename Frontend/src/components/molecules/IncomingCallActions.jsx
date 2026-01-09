@@ -1,4 +1,4 @@
-export const IncomingCallActions = ({ onAccept, onDecline, isVideo }) => {
+export const IncomingCallActions = ({ onAccept, onDecline }) => {
   return (
     <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-40 flex gap-10">
       <button

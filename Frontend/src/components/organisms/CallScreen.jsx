@@ -7,41 +7,56 @@ import { useRef, useEffect } from "react";
 
 export const CallScreen = () => {
   const {
-    peer,
-    callState, // idle | calling | incoming | connected | ended
-    isCalleeOnline,
+    selfUser,
+    peerUser,
+    callState,
     isVideo,
     isMinimized,
     hasLocalStream,
-    localStreamRef,
-    remoteStreamRef,
+    isCalleeOnline,
+
     acceptCall,
     declineCall,
     endCall,
     minimizeCall,
     restoreCall,
+
+    localStreamRef,
+    remoteStreamRef,
   } = useWebRTC();
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
 
-  // Attach LOCAL stream
+  /* ================= ATTACH LOCAL STREAM ================= */
   useEffect(() => {
     if (localVideoRef.current && localStreamRef.current) {
       localVideoRef.current.srcObject = localStreamRef.current;
     }
-  }, [hasLocalStream]);
+  }, [callState, hasLocalStream]);
 
-  // Attach REMOTE stream
+  /* ================= ATTACH REMOTE STREAM ================= */
   useEffect(() => {
     if (remoteVideoRef.current && remoteStreamRef.current) {
       remoteVideoRef.current.srcObject = remoteStreamRef.current;
     }
-  }, [remoteStreamRef.current]);
+  }, [callState]);
+
+  /* ================= CLEANUP ================= */
+  useEffect(() => {
+    return () => {
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+      }
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = null;
+      }
+    };
+  }, []);
 
   if (callState === "idle" || callState === "ended") return null;
 
-  /* ================= MINIMIZED ================= */
+  /* ================= MINIMIZED VIEW ================= */
   if (isMinimized) {
     return (
       <div
@@ -51,11 +66,7 @@ export const CallScreen = () => {
         {/* VIDEO CALL → LIVE PREVIEW */}
         {isVideo && remoteStreamRef.current ? (
           <video
-            ref={(el) => {
-              if (el && remoteStreamRef.current) {
-                el.srcObject = remoteStreamRef.current;
-              }
-            }}
+            ref={remoteVideoRef}
             autoPlay
             muted
             playsInline
@@ -68,7 +79,6 @@ export const CallScreen = () => {
           </div>
         )}
 
-        {/* optional hover hint */}
         <span className="absolute -top-6 right-0 text-xs opacity-0 group-hover:opacity-100 transition">
           Tap to return
         </span>
@@ -76,11 +86,12 @@ export const CallScreen = () => {
     );
   }
 
+  /* ================= FULL CALL SCREEN ================= */
   return (
     <div className="fixed inset-0 z-50 text-white overflow-hidden">
       {/* BACKGROUND */}
       <CallBackground
-        peer={peer}
+        peer={peerUser}
         isVideo={isVideo}
         callState={callState}
         hasLocalStream={hasLocalStream}
@@ -90,16 +101,16 @@ export const CallScreen = () => {
       />
 
       {/* TOP BAR */}
-      {isVideo && !isMinimized && (
+      {isVideo && (
         <CallTopBar
-          peer={peer}
+          peer={peerUser}
           callState={callState}
           isCalleeOnline={isCalleeOnline}
           onMinimize={minimizeCall}
         />
       )}
 
-      {/* INCOMING (receiver only) */}
+      {/* INCOMING CALL ACTIONS */}
       {callState === "incoming" && (
         <IncomingCallActions
           isVideo={isVideo}
@@ -108,10 +119,14 @@ export const CallScreen = () => {
         />
       )}
 
-      {/* CONTROLS (caller + connected) */}
-      {(callState === "calling" || callState === "connected") && (
+      {(callState === "calling" ||
+        callState === "ringing" ||
+        callState === "connected") && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
-          <CallControls onEnd={endCall} type={isVideo ? "video" : "voice"} />
+          <CallControls
+            onEnd={() => endCall({ initiatorUserId: selfUser.id })}
+            type={isVideo ? "video" : "voice"}
+          />
         </div>
       )}
     </div>

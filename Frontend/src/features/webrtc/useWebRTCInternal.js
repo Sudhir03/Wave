@@ -1,11 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 import socket from "../../socket";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { getMyProfile } from "@/api/users";
+import { useAuth } from "@clerk/clerk-react";
 
 const ICE_SERVERS = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 };
 
 export function useWebRTCInternal() {
+  const { getToken } = useAuth();
+
+  const { data: profile } = useQuery({
+    queryKey: ["myProfile"],
+    queryFn: async () => {
+      const token = await getToken();
+      return getMyProfile({ token });
+    },
+    select: (res) => res.user,
+  });
+
   const pcRef = useRef(null);
   const localStreamRef = useRef(null);
   const remoteStreamRef = useRef(null);
@@ -13,33 +27,67 @@ export function useWebRTCInternal() {
   // =========================
   // STATE
   // =========================
-  const [callee, setCallee] = useState(null);
+  const [selfUser, setSelfUser] = useState(null);
+  const [peerUser, setPeerUser] = useState(null);
   const [callState, setCallState] = useState("idle");
   // idle | calling | incoming | connected | ended
 
   const [isVideo, setIsVideo] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [hasLocalStream, setHasLocalStream] = useState(false);
+  const [hasRemoteStream, setHasRemoteStream] = useState(false);
 
   // 🔑 NEW: Presence flag (caller side only)
   const [isCalleeOnline, setIsCalleeOnline] = useState(false);
 
+  useEffect(() => {
+    if (!profile?._id) return;
+
+    setSelfUser({
+      id: profile._id,
+      name: `${profile.firstName} ${profile.lastName}`,
+      avatar: profile.profileImageUrl,
+    });
+  }, [profile]);
+
   // =========================
   // PEER
   // =========================
-  const createPeer = () => {
+  const createPeer = (targetUserId) => {
     if (pcRef.current) return;
 
     const pc = new RTCPeerConnection(ICE_SERVERS);
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
-        socket.emit("webrtc_ice_candidate", { candidate: e.candidate });
+        socket.emit("webrtc_ice_candidate", {
+          candidate: e.candidate,
+          targetUserId,
+        });
       }
     };
 
     pc.ontrack = (e) => {
-      remoteStreamRef.current = e.streams[0];
+      if (!remoteStreamRef.current) {
+        remoteStreamRef.current = new MediaStream();
+        setHasRemoteStream(true);
+      }
+
+      const alreadyAdded = remoteStreamRef.current
+        .getTracks()
+        .some((track) => track.id === e.track.id);
+
+      if (!alreadyAdded) {
+        remoteStreamRef.current.addTrack(e.track);
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log("Connection:", pc.connectionState);
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log("ICE:", pc.iceConnectionState);
     };
 
     pcRef.current = pc;
@@ -58,95 +106,150 @@ export function useWebRTCInternal() {
     remoteStreamRef.current = null;
 
     setHasLocalStream(false);
+    setHasRemoteStream(false);
     setIsVideo(false);
     setIsMinimized(false);
     setIsCalleeOnline(false);
+    setPeerUser(null);
   };
 
   // =========================
   // CALLER
   // =========================
   const startCall = async ({ video = false, callee }) => {
-    setCallee(callee);
-    setIsVideo(video);
-    setIsMinimized(false);
-    setCallState("calling");
+    try {
+      if (!selfUser) {
+        console.error("Caller profile missing");
+        return;
+      }
 
-    // 🔹 Ask backend if callee is online
-    if (callee?.id) {
-      const userId = callee.id;
-      socket.emit("check_user_online", { userId });
+      setPeerUser(callee);
+      setIsVideo(video);
+      setIsMinimized(false);
+      setCallState("calling");
+
+      // 🔹 Optional: check if callee is online
+
+      socket.emit("check_user_online", { calleeId: callee.id });
+
+      // 🔹 Get media
+      localStreamRef.current = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: video === true,
+      });
+
+      // 🔹 Audio-only safety
+      if (!video) {
+        localStreamRef.current.getVideoTracks().forEach((t) => t.stop());
+      }
+
+      setHasLocalStream(true);
+
+      // 🔹 Create PeerConnection
+      createPeer(callee.id);
+
+      // 🔹 Add tracks
+      localStreamRef.current.getTracks().forEach((track) => {
+        pcRef.current.addTrack(track, localStreamRef.current);
+      });
+
+      // 🔹 Offer
+      const offer = await pcRef.current.createOffer();
+      await pcRef.current.setLocalDescription(offer);
+
+      // 🔹 Send offer WITH caller profile
+      socket.emit("webrtc_offer", {
+        calleeId: callee.id,
+        offer,
+        callType: video ? "video" : "audio",
+        caller: selfUser,
+      });
+    } catch (err) {
+      console.error("startCall failed:", err);
+      setCallState("idle");
     }
-
-    // 🔹 Media (STRICT)
-    localStreamRef.current = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: video,
-    });
-
-    // Extra safety: audio call => no video tracks
-    if (!video) {
-      localStreamRef.current.getVideoTracks().forEach((t) => t.stop());
-    }
-
-    setHasLocalStream(true);
-
-    createPeer();
-
-    localStreamRef.current.getTracks().forEach((track) => {
-      pcRef.current.addTrack(track, localStreamRef.current);
-    });
-
-    const offer = await pcRef.current.createOffer();
-    await pcRef.current.setLocalDescription(offer);
-
-    socket.emit("webrtc_offer", { offer, callType: video ? "video" : "audio" });
   };
 
   // =========================
   // RECEIVER
   // =========================
   const acceptCall = async ({ video = false }) => {
-    setIsVideo(video);
-    setIsMinimized(false);
+    try {
+      if (!selfUser) {
+        console.error("Caller profile missing");
+        return;
+      }
 
-    localStreamRef.current = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: video,
-    });
+      setIsVideo(video);
+      setIsMinimized(false);
 
-    if (!video) {
-      localStreamRef.current.getVideoTracks().forEach((t) => t.stop());
+      // 🔹 Create Peer first (callerId for ICE routing)
+      if (!peerUser?.id) return;
+      createPeer(peerUser.id);
+
+      // 🔹 Get media
+      localStreamRef.current = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: video === true,
+      });
+
+      // 🔹 Audio-only safety
+      if (!video) {
+        localStreamRef.current.getVideoTracks().forEach((t) => t.stop());
+      }
+
+      setHasLocalStream(true);
+
+      // 🔹 Add tracks
+      localStreamRef.current.getTracks().forEach((track) => {
+        pcRef.current.addTrack(track, localStreamRef.current);
+      });
+
+      // 🔹 Create + set answer
+      const answer = await pcRef.current.createAnswer();
+      await pcRef.current.setLocalDescription(answer);
+
+      // 🔹 Send answer back to caller
+      socket.emit("webrtc_answer", {
+        callerId: peerUser.id,
+        answer,
+      });
+
+      setCallState("connected");
+    } catch (err) {
+      console.error("acceptCall failed:", err);
+      setCallState("idle");
     }
-
-    setHasLocalStream(true);
-
-    createPeer();
-
-    localStreamRef.current.getTracks().forEach((track) => {
-      pcRef.current.addTrack(track, localStreamRef.current);
-    });
-
-    const answer = await pcRef.current.createAnswer();
-    await pcRef.current.setLocalDescription(answer);
-
-    socket.emit("webrtc_answer", { answer });
-    setCallState("connected");
   };
 
   // =========================
   // END / DECLINE
   // =========================
   const declineCall = () => {
-    socket.emit("webrtc_call_declined");
-    cleanupCall();
-    setCallState("idle");
+    try {
+      socket.emit("webrtc_call_declined", {
+        callerId: peerUser.id,
+      });
+    } catch (error) {
+      console.error("declineCall failed:", error);
+    } finally {
+      cleanupCall();
+      setCallState("ended");
+    }
   };
 
-  const endCall = () => {
-    socket.emit("webrtc_call_end");
-    cleanupCall();
-    setCallState("ended");
+  const endCall = ({ initiatorUserId }) => {
+    try {
+      socket.emit("webrtc_call_end", {
+        targetUserId:
+          initiatorUserId === selfUser.id ? peerUser.id : selfUser.id,
+      });
+    } catch (error) {
+      console.error("endCall failed:", error);
+    } finally {
+      cleanupCall();
+      setCallState("ended");
+    }
   };
 
   // =========================
@@ -159,10 +262,11 @@ export function useWebRTCInternal() {
   // SOCKET LISTENERS
   // =========================
   useEffect(() => {
-    const onOffer = async ({ offer, callType }) => {
-      setCallState("incoming"); // 🔥 NOT ringing
+    const onOffer = async ({ caller, offer, callType }) => {
+      setPeerUser(caller);
+      setCallState("incoming");
       setIsVideo(callType === "video" ? true : false);
-      createPeer();
+      createPeer(caller.id);
       await pcRef.current.setRemoteDescription(offer);
     };
 
@@ -172,7 +276,9 @@ export function useWebRTCInternal() {
     };
 
     const onCandidate = ({ candidate }) => {
-      pcRef.current?.addIceCandidate(candidate);
+      if (pcRef.current?.remoteDescription) {
+        pcRef.current.addIceCandidate(candidate);
+      }
     };
 
     const onDeclined = () => {
@@ -187,6 +293,13 @@ export function useWebRTCInternal() {
 
     const onCalleeStatus = ({ online }) => {
       setIsCalleeOnline(online);
+
+      if (online) {
+        setCallState("ringing");
+      } else {
+        cleanupCall();
+        setCallState("idle");
+      }
     };
 
     socket.on("webrtc_offer", onOffer);
@@ -211,12 +324,13 @@ export function useWebRTCInternal() {
   // =========================
   return {
     // state
-    peer,
+    selfUser,
+    peerUser,
     callState,
     isVideo,
     isMinimized,
     hasLocalStream,
-    isCalleeOnline, // 🔑 IMPORTANT
+    isCalleeOnline,
 
     // actions
     startCall,

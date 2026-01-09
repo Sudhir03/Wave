@@ -12,7 +12,7 @@ export const CallBackground = ({
   /* ================= AUDIO CALL ================= */
   if (!isVideo) {
     return (
-      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-slate-900 via-neutral-900 to-black text-white">
+      <div className="absolute inset-0 flex flex-col items-center justify-center bg-linear-to-b from-slate-900 via-neutral-900 to-black text-white">
         {/* Avatar */}
         <Avatar className="h-36 w-36 border-4 border-white/10 shadow-2xl">
           <AvatarImage src={peer?.avatar} />
@@ -38,7 +38,9 @@ export const CallBackground = ({
         )}
 
         {callState !== "incoming" && (
-          <p className="mt-2 text-xs tracking-wide text-slate-400">Calling…</p>
+          <p className="mt-2 text-xs tracking-wide text-slate-400">
+            {callState}
+          </p>
         )}
       </div>
     );

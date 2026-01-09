@@ -136,6 +136,11 @@ async function getPresence(userId) {
   return presence;
 }
 
+async function isUserOnline(userId) {
+  const presence = await redis.hGetAll(PRESENCE_KEY(userId));
+  return presence?.status === "online" || presence?.status === "in_chat";
+}
+
 // =======================
 // Exports
 // =======================
@@ -145,4 +150,5 @@ module.exports = {
   setOnlineFromChat,
   handleDisconnect,
   getPresence,
+  isUserOnline,
 };
