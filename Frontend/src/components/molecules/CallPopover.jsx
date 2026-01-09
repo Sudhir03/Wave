@@ -10,7 +10,7 @@ export const CallPopover = ({ type, peer }) => {
   const handleClick = () => {
     startCall({
       video: !isAudio,
-      peer: {
+      callee: {
         id: peer._id,
         name: peer.fullName,
         avatar: peer.profileImageUrl,

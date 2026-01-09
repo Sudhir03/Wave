@@ -13,7 +13,7 @@ export function useWebRTCInternal() {
   // =========================
   // STATE
   // =========================
-  const [peer, setPeer] = useState(null);
+  const [callee, setCallee] = useState(null);
   const [callState, setCallState] = useState("idle");
   // idle | calling | incoming | connected | ended
 
@@ -66,15 +66,15 @@ export function useWebRTCInternal() {
   // =========================
   // CALLER
   // =========================
-  const startCall = async ({ video = false, peer }) => {
-    setPeer(peer);
+  const startCall = async ({ video = false, callee }) => {
+    setCallee(callee);
     setIsVideo(video);
     setIsMinimized(false);
     setCallState("calling");
 
     // 🔹 Ask backend if callee is online
-    if (peer?.id) {
-      const userId = peer.id;
+    if (callee?.id) {
+      const userId = callee.id;
       socket.emit("check_user_online", { userId });
     }
 
