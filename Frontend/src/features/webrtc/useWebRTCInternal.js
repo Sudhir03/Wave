@@ -58,6 +58,8 @@ export function useWebRTCInternal() {
 
     const pc = new RTCPeerConnection(ICE_SERVERS);
 
+    pc.addTransceiver("audio", { direction: "sendrecv" });
+
     pc.onicecandidate = (e) => {
       if (e.candidate) {
         socket.emit("webrtc_ice_candidate", {
@@ -80,14 +82,6 @@ export function useWebRTCInternal() {
       if (!alreadyAdded) {
         remoteStreamRef.current.addTrack(e.track);
       }
-    };
-
-    pc.onconnectionstatechange = () => {
-      console.log("Connection:", pc.connectionState);
-    };
-
-    pc.oniceconnectionstatechange = () => {
-      console.log("ICE:", pc.iceConnectionState);
     };
 
     pcRef.current = pc;
@@ -133,15 +127,14 @@ export function useWebRTCInternal() {
       socket.emit("check_user_online", { calleeId: callee.id });
 
       // 🔹 Get media
-      localStreamRef.current = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: video === true,
-      });
+      localStreamRef.current = await navigator.mediaDevices.getUserMedia(
+        video ? { audio: true, video: true } : { audio: true }
+      );
 
       // 🔹 Audio-only safety
-      if (!video) {
-        localStreamRef.current.getVideoTracks().forEach((t) => t.stop());
-      }
+      // if (!video) {
+      //   localStreamRef.current.getVideoTracks().forEach((t) => t.stop());
+      // }
 
       setHasLocalStream(true);
 
@@ -295,7 +288,7 @@ export function useWebRTCInternal() {
       setIsCalleeOnline(online);
 
       if (online) {
-        setCallState("ringing");
+        setCallState("ringing"); // 👈 THIS IS MISSING
       } else {
         cleanupCall();
         setCallState("idle");

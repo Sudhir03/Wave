@@ -6,7 +6,6 @@ export const CallPopover = ({ type, peer }) => {
   const { startCall } = useWebRTC();
   const isAudio = type === "audio";
   const Icon = isAudio ? Phone : Video;
-
   const handleClick = () => {
     startCall({
       video: !isAudio,
