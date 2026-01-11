@@ -26,7 +26,6 @@ import { VoicePlayer } from "@/components/molecules/media/VoicePlayer";
 import { VoiceMessageSender } from "@/components/molecules/VoiceMessageSender";
 import { ChatSearch } from "@/components/molecules/ChatSearch";
 import { MoreOptionsPopover } from "@/components/molecules/MoreOptionsPopover";
-import { CameraCaptureButton } from "@/components/molecules/CameraCaptureButton";
 import { CallPopover } from "@/components/molecules/CallPopover";
 import { MessageStatus } from "@/components/molecules/MessageStatus";
 import { formatLastSeen } from "@/lib/utils";
@@ -278,7 +277,6 @@ export default function ChatDetail() {
       <div className="px-12 py-2 mb-6 flex gap-2 items-end">
         {/* LEFT ICONS */}
         <div className="flex items-end gap-2">
-          <CameraCaptureButton onSelect={handleSendMedia} />
           <MediaPickerPopover onSelect={handleSendMedia} />
           <EmojiPopover onSelect={(e) => setMessage(message + e)} />
           <VoiceMessageSender onVoiceSend={(m) => handleSendMedia([m])} />
