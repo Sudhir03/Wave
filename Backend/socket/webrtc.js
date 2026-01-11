@@ -96,4 +96,20 @@ module.exports = function registerWebRTCHandlers(io, socket) {
 
     io.to(callerId).emit("webrtc_call_declined");
   });
+
+  // =======================
+  // WEBRTC MEDIA STATE (Mic / Camera)
+  // =======================
+  socket.on("webrtc_media_state", async ({ targetUserId, cameraOn, micOn }) => {
+    if (!socket.userId) return;
+
+    const online = await isUserOnline(targetUserId);
+    if (!online) return;
+
+    io.to(targetUserId).emit("webrtc_media_state", {
+      fromUserId: socket.userId,
+      cameraOn,
+      micOn,
+    });
+  });
 };
