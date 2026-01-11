@@ -1,4 +1,4 @@
-import { CallBackground } from "./CallBackground";
+import { CallBackground } from "@/components/organisms/CallBackground";
 import { CallTopBar } from "@/components/molecules/CallTopBar";
 import { IncomingCallActions } from "@/components/molecules/IncomingCallActions";
 import { CallControls } from "@/components/molecules/CallControls";
@@ -24,6 +24,20 @@ export const CallScreen = () => {
 
     localStreamRef,
     remoteStreamRef,
+
+    toggleMic,
+    toggleCamera,
+
+    switchCamera,
+    canSwitchCamera,
+
+    isMicOn,
+    isCameraOn,
+
+    peerCameraOn,
+    peerMicOn,
+
+    localStreamVersion,
   } = useWebRTC();
 
   /* ================= VIDEO REFS ================= */
@@ -35,9 +49,10 @@ export const CallScreen = () => {
   /* ================= ATTACH LOCAL STREAM ================= */
   useEffect(() => {
     if (localVideoRef.current && localStreamRef.current) {
+      localVideoRef.current.srcObject = null;
       localVideoRef.current.srcObject = localStreamRef.current;
     }
-  }, [callState, hasLocalStream, isMinimized]);
+  }, [callState, hasLocalStream, localStreamVersion]);
 
   /* ================= ATTACH REMOTE STREAM (FULLSCREEN) ================= */
   useEffect(() => {
@@ -82,7 +97,7 @@ export const CallScreen = () => {
         onClick={restoreCall}
         className="fixed bottom-12 left-12 z-50 cursor-pointer group"
       >
-        {isVideo && remoteStreamRef.current ? (
+        {isVideo && remoteStreamRef.current && peerCameraOn ? (
           <video
             ref={minimizedRemoteVideoRef}
             autoPlay
@@ -113,6 +128,10 @@ export const CallScreen = () => {
         callState={callState}
         hasLocalStream={hasLocalStream}
         hasRemoteStream={!!remoteStreamRef.current}
+        isCameraOn={isCameraOn}
+        isMicOn={isMicOn}
+        peerCameraOn={peerCameraOn} // 👈 ADD
+        peerMicOn={peerMicOn} // 👈 ADD
         localVideoRef={localVideoRef}
         remoteVideoRef={remoteVideoRef}
       />
@@ -148,6 +167,12 @@ export const CallScreen = () => {
           <CallControls
             onEnd={() => endCall({ initiatorUserId: selfUser.id })}
             type={isVideo ? "video" : "voice"}
+            isMicOn={isMicOn}
+            isCameraOn={isCameraOn}
+            onToggleMic={toggleMic}
+            onToggleCamera={toggleCamera}
+            onSwitchCamera={switchCamera}
+            canSwitchCamera={canSwitchCamera}
           />
         </div>
       )}

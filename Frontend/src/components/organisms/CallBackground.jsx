@@ -1,4 +1,34 @@
+import { MicOff } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "../atoms/Avatar";
+
+const AvatarWithPulse = ({ peer, pulse = false, size = "lg" }) => {
+  const sizeMap = {
+    sm: "h-24 w-24 text-2xl",
+    md: "h-32 w-32 text-3xl",
+    lg: "h-36 w-36 text-3xl",
+  };
+
+  return (
+    <div className="relative flex items-center justify-center">
+      {pulse && (
+        <span className="absolute inset-0 rounded-full animate-ping bg-accent/40" />
+      )}
+
+      <Avatar
+        className={`relative border-4 border-white/10 shadow-2xl ${sizeMap[size]}`}
+      >
+        <AvatarImage src={peer?.avatar} />
+        <AvatarFallback className="bg-slate-700 font-semibold">
+          {peer?.name
+            ?.split(" ")
+            .map((n) => n[0])
+            .join("")
+            .slice(0, 2)}
+        </AvatarFallback>
+      </Avatar>
+    </div>
+  );
+};
 
 export const CallBackground = ({
   peer,
@@ -6,73 +36,74 @@ export const CallBackground = ({
   callState,
   hasLocalStream,
   hasRemoteStream,
+  isCameraOn,
+  peerCameraOn = true,
+  peerMicOn = true,
   localVideoRef,
   remoteVideoRef,
 }) => {
-  /* ================= AUDIO CALL ================= */
-  if (!isVideo) {
-    return (
-      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-slate-900 via-neutral-900 to-black text-white">
-        <Avatar className="h-36 w-36 border-4 border-white/10 shadow-2xl">
-          <AvatarImage src={peer?.avatar} />
-          <AvatarFallback className="bg-slate-700 text-3xl font-semibold">
-            {peer?.name
-              ?.split(" ")
-              .map((n) => n[0])
-              .join("")
-              .slice(0, 2)}
-          </AvatarFallback>
-        </Avatar>
+  const showPulse =
+    callState === "calling" ||
+    callState === "ringing" ||
+    callState === "incoming";
 
-        <h2 className="mt-6 text-2xl font-semibold tracking-wide">
-          {peer?.name}
-        </h2>
+  const showAvatar =
+    !isVideo ||
+    !peerCameraOn ||
+    callState === "ringing" ||
+    callState === "incoming";
 
-        <p className="mt-2 text-xs tracking-wide text-slate-400">
-          {callState === "incoming" ? "Incoming call" : callState}
-        </p>
-      </div>
-    );
-  }
-
-  /* ================= VIDEO CALL (PiP) ================= */
   return (
     <div className="absolute inset-0 bg-black overflow-hidden">
-      {/* 🌍 Remote Video – Fullscreen */}
-      {hasRemoteStream && (
-        <video
-          ref={remoteVideoRef}
-          autoPlay
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover"
-        />
+      {/* ================= REMOTE VIDEO ================= */}
+      <video
+        ref={remoteVideoRef}
+        autoPlay
+        playsInline
+        className={`absolute inset-0 w-full h-full object-cover ${
+          !isVideo || !hasRemoteStream || !peerCameraOn ? "hidden" : ""
+        }`}
+      />
+
+      {/* ================= PEER MIC OFF (VIDEO CALL) ================= */}
+      {isVideo && hasRemoteStream && peerCameraOn && !peerMicOn && (
+        <div className="absolute top-4 left-42 px-3 py-1 rounded-full text-xs z-50 flex items-center justify-center">
+          <MicOff className="w-4 h-4 text-white" />
+        </div>
       )}
 
-      {/* 🧍 Local Video – PiP */}
-      {hasLocalStream && (
+      {/* ================= AVATAR UI (AUDIO OR CAMERA OFF) ================= */}
+      {showAvatar && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-slate-900 via-neutral-900 to-black">
+          <AvatarWithPulse peer={peer} pulse={showPulse} />
+
+          <h2 className="mt-6 text-2xl font-semibold">{peer?.name}</h2>
+
+          <p className="mt-2 text-sm text-slate-400">
+            {!isVideo ? "Audio call" : "Video call"}
+          </p>
+
+          <p className="mt-2 text-xs tracking-wide text-slate-400">
+            {callState === "incoming" ? "Incoming call" : callState}
+          </p>
+
+          {!peerMicOn && (
+            <div className="absolute top-4 left-42 px-3 py-1 rounded-full text-xs z-50 flex items-center justify-center">
+              <MicOff className="w-4 h-4 text-white" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ================= LOCAL VIDEO PiP ================= */}
+      {callState === "connected" && hasLocalStream && isCameraOn && isVideo && (
         <video
           ref={localVideoRef}
           autoPlay
           muted
           playsInline
-          className={`
-            absolute 
-            bottom-4 right-4
-            w-36 h-48 sm:w-44 sm:h-60
-            object-cover
-            rounded-xl
-            border border-white/20
-            shadow-2xl
-            bg-black
-          `}
+          className="absolute bottom-4 right-4 w-36 h-48 rounded-xl object-cover border border-white/20"
         />
-      )}
-
-      {/* ⏳ Connecting fallback */}
-      {!hasLocalStream && !hasRemoteStream && (
-        <div className="absolute inset-0 flex items-center justify-center text-sm opacity-70 text-white">
-          Connecting…
-        </div>
       )}
     </div>
   );

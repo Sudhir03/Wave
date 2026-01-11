@@ -23,6 +23,8 @@ export function useWebRTCInternal() {
   const pcRef = useRef(null);
   const localStreamRef = useRef(null);
   const remoteStreamRef = useRef(null);
+  const peerUserRef = useRef(null);
+  const pendingCandidates = useRef([]);
 
   // =========================
   // STATE
@@ -36,9 +38,17 @@ export function useWebRTCInternal() {
   const [isMinimized, setIsMinimized] = useState(false);
   const [hasLocalStream, setHasLocalStream] = useState(false);
   const [hasRemoteStream, setHasRemoteStream] = useState(false);
+  const [isCameraOn, setIsCameraOn] = useState(true);
+  const [isMicOn, setIsMicOn] = useState(true);
+  const [peerCameraOn, setPeerCameraOn] = useState(true);
+  const [peerMicOn, setPeerMicOn] = useState(true);
+  const [localStreamVersion, setLocalStreamVersion] = useState(0);
 
   // 🔑 NEW: Presence flag (caller side only)
   const [isCalleeOnline, setIsCalleeOnline] = useState(false);
+
+  //camera switch
+  const [currentFacingMode, setCurrentFacingMode] = useState("user");
 
   useEffect(() => {
     if (!profile?._id) return;
@@ -103,6 +113,10 @@ export function useWebRTCInternal() {
     setIsMinimized(false);
     setIsCalleeOnline(false);
     setPeerUser(null);
+
+    // ✅ RESET PEER MEDIA STATE
+    setPeerCameraOn(true);
+    setPeerMicOn(true);
   };
 
   // =========================
@@ -115,10 +129,18 @@ export function useWebRTCInternal() {
         return;
       }
 
+      // ✅ RESET PEER STATE FOR NEW CALL
+      setPeerCameraOn(true);
+      setPeerMicOn(true);
+
       setPeerUser(callee);
       setIsVideo(video);
       setIsMinimized(false);
       setCallState("calling");
+
+      // ✅ RESET STATES HERE
+      setIsMicOn(true);
+      setIsCameraOn(video);
 
       // 🔹 Optional: check if callee is online
 
@@ -171,8 +193,16 @@ export function useWebRTCInternal() {
         return;
       }
 
+      // ✅ RESET PEER MEDIA STATE FOR NEW INCOMING CALL
+      setPeerCameraOn(true);
+      setPeerMicOn(true);
+
       setIsVideo(video);
       setIsMinimized(false);
+
+      // ✅ RESET STATES HERE
+      setIsMicOn(true);
+      setIsCameraOn(video);
 
       // 🔹 Create Peer first (callerId for ICE routing)
       if (!peerUser?.id) return;
@@ -243,6 +273,114 @@ export function useWebRTCInternal() {
     }
   };
 
+  //mic and camera toggle
+  const toggleMic = () => {
+    const audioTrack = localStreamRef.current?.getAudioTracks()[0];
+    if (!audioTrack) return;
+
+    audioTrack.enabled = !audioTrack.enabled;
+    setIsMicOn(audioTrack.enabled);
+
+    socket.emit("webrtc_media_state", {
+      targetUserId: peerUser.id,
+      cameraOn: isCameraOn,
+      micOn: audioTrack.enabled,
+    });
+  };
+
+  const toggleCamera = async () => {
+    const stream = localStreamRef.current;
+    if (!stream || !pcRef.current) return;
+
+    const videoTrack = stream.getVideoTracks()[0];
+
+    // CAMERA OFF
+    if (videoTrack && videoTrack.enabled) {
+      videoTrack.enabled = false;
+      setIsCameraOn(false);
+
+      socket.emit("webrtc_media_state", {
+        targetUserId: peerUser.id,
+        cameraOn: false,
+        micOn: isMicOn,
+      });
+
+      return;
+    }
+
+    // CAMERA ON
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+    });
+    const newVideoTrack = newStream.getVideoTracks()[0];
+
+    // Remove old tracks
+    stream.getVideoTracks().forEach((t) => {
+      stream.removeTrack(t);
+      t.stop();
+    });
+
+    stream.addTrack(newVideoTrack);
+
+    // Replace for peer
+    const sender = pcRef.current
+      .getSenders()
+      .find((s) => s.track?.kind === "video");
+
+    sender
+      ? await sender.replaceTrack(newVideoTrack)
+      : pcRef.current.addTrack(newVideoTrack, stream);
+
+    setIsCameraOn(true);
+
+    // 🔑 THIS is the fix
+    setLocalStreamVersion((v) => v + 1);
+
+    socket.emit("webrtc_media_state", {
+      targetUserId: peerUser.id,
+      cameraOn: true,
+      micOn: isMicOn,
+    });
+  };
+
+  //camera swtich action
+  const switchCamera = async () => {
+    if (!localStreamRef.current || !pcRef.current) return;
+
+    const oldVideoTrack = localStreamRef.current.getVideoTracks()[0];
+    if (!oldVideoTrack) return;
+
+    const newFacingMode = currentFacingMode === "user" ? "environment" : "user";
+
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: newFacingMode },
+      });
+
+      const newVideoTrack = newStream.getVideoTracks()[0];
+
+      localStreamRef.current.removeTrack(oldVideoTrack);
+      oldVideoTrack.stop();
+      localStreamRef.current.addTrack(newVideoTrack);
+
+      const sender = pcRef.current
+        .getSenders()
+        .find((s) => s.track?.kind === "video");
+
+      await sender?.replaceTrack(newVideoTrack);
+
+      setCurrentFacingMode(newFacingMode);
+
+      // 🔑 force local preview refresh
+      setLocalStreamVersion((v) => v + 1);
+    } catch (err) {
+      console.warn("Camera switch failed:", err);
+    }
+  };
+
+  //can switch camera
+  const canSwitchCamera = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+
   // =========================
   // UI ONLY
   // =========================
@@ -250,25 +388,54 @@ export function useWebRTCInternal() {
   const restoreCall = () => setIsMinimized(false);
 
   // =========================
+  //sets peer user
+  // =========================
+  useEffect(() => {
+    peerUserRef.current = peerUser;
+  }, [peerUser]);
+
+  // =========================
   // SOCKET LISTENERS
   // =========================
   useEffect(() => {
+    // =========================
+    // Call Signaling Handlers
+    // =========================
+
     const onOffer = async ({ caller, offer, callType }) => {
       setPeerUser(caller);
       setCallState("incoming");
-      setIsVideo(callType === "video" ? true : false);
+      setIsVideo(callType === "video");
       createPeer(caller.id);
       await pcRef.current.setRemoteDescription(offer);
+
+      // 🔥 FLUSH ICE CANDIDATES HERE
+      pendingCandidates.current.forEach((c) =>
+        pcRef.current.addIceCandidate(c)
+      );
+      pendingCandidates.current = [];
     };
 
     const onAnswer = async ({ answer }) => {
+      if (!pcRef.current) return;
       await pcRef.current.setRemoteDescription(answer);
+
+      // 🔥 FLUSH ICE CANDIDATES HERE
+      pendingCandidates.current.forEach((c) =>
+        pcRef.current.addIceCandidate(c)
+      );
+      pendingCandidates.current = [];
+
       setCallState("connected");
     };
 
     const onCandidate = ({ candidate }) => {
-      if (pcRef.current?.remoteDescription) {
+      if (!pcRef.current) return;
+
+      if (pcRef.current.remoteDescription) {
         pcRef.current.addIceCandidate(candidate);
+      } else {
+        pendingCandidates.current.push(candidate);
       }
     };
 
@@ -285,13 +452,33 @@ export function useWebRTCInternal() {
     const onCalleeStatus = ({ online }) => {
       setIsCalleeOnline(online);
 
-      if (online) {
-        setCallState("ringing"); // 👈 THIS IS MISSING
-      } else {
-        cleanupCall();
-        setCallState("idle");
-      }
+      setCallState((prev) => {
+        if (online && prev === "calling") {
+          return "ringing";
+        }
+
+        if (!online && prev === "calling") {
+          return "calling";
+        }
+
+        return prev;
+      });
     };
+
+    // =========================
+    // Media State Handler
+    // =========================
+
+    const onPeerMediaState = ({ fromUserId, cameraOn, micOn }) => {
+      if (fromUserId !== peerUserRef.current?.id) return;
+
+      setPeerCameraOn(cameraOn);
+      setPeerMicOn(micOn);
+    };
+
+    // =========================
+    // Socket Listeners
+    // =========================
 
     socket.on("webrtc_offer", onOffer);
     socket.on("webrtc_answer", onAnswer);
@@ -299,6 +486,11 @@ export function useWebRTCInternal() {
     socket.on("webrtc_call_declined", onDeclined);
     socket.on("webrtc_call_end", onEnded);
     socket.on("callee_status", onCalleeStatus);
+    socket.on("webrtc_media_state", onPeerMediaState);
+
+    // =========================
+    // Cleanup
+    // =========================
 
     return () => {
       socket.off("webrtc_offer", onOffer);
@@ -307,8 +499,26 @@ export function useWebRTCInternal() {
       socket.off("webrtc_call_declined", onDeclined);
       socket.off("webrtc_call_end", onEnded);
       socket.off("callee_status", onCalleeStatus);
+      socket.off("webrtc_media_state", onPeerMediaState);
     };
   }, []);
+
+  // =========================
+  // RING TIMEOUT (CALLER SIDE)
+  // =========================
+  useEffect(() => {
+    // Only apply to caller when ringing
+    if (callState !== "ringing") return;
+    if (!selfUser?.id) return; // 🔥 SAFETY GUARD
+
+    const timeout = setTimeout(() => {
+      console.warn("Call timed out (no answer)");
+
+      endCall({ initiatorUserId: selfUser.id });
+    }, 30000); // 30 seconds
+
+    return () => clearTimeout(timeout);
+  }, [callState, selfUser, endCall]);
 
   // =========================
   // EXPOSE
@@ -334,5 +544,24 @@ export function useWebRTCInternal() {
     // refs
     localStreamRef,
     remoteStreamRef,
+
+    //toggle
+    toggleMic,
+    toggleCamera,
+
+    //mic
+    isMicOn,
+    isCameraOn,
+
+    switchCamera,
+    canSwitchCamera,
+
+    isCameraOn,
+    isMicOn,
+
+    peerCameraOn,
+    peerMicOn,
+
+    localStreamVersion,
   };
 }

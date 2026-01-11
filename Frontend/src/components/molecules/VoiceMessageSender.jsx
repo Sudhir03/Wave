@@ -6,8 +6,12 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/atoms/Button";
 import { Mic, Send, Square } from "lucide-react";
+import { useWebRTCInternal } from "@/features/webrtc/useWebRTCInternal";
 
 export function VoiceMessageSender({ onVoiceSend }) {
+  const { callState } = useWebRTCInternal();
+  const isCallActive = callState !== "idle";
+
   const [open, setOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [mediaBlob, setMediaBlob] = useState(null);
@@ -17,6 +21,8 @@ export function VoiceMessageSender({ onVoiceSend }) {
   const timerRef = useRef(null);
 
   const startRecording = async () => {
+    if (isCallActive) return; // 🔒 HARD BLOCK
+
     try {
       const micStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -89,6 +95,7 @@ export function VoiceMessageSender({ onVoiceSend }) {
   };
 
   const handlePopoverChange = (val) => {
+    if (isCallActive) return; // 🔒 BLOCK OPEN
     setOpen(val);
     if (!val && (isRecording || mediaBlob)) {
       resetState();
@@ -106,19 +113,21 @@ export function VoiceMessageSender({ onVoiceSend }) {
   return (
     <Popover open={open} onOpenChange={handlePopoverChange}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" className="p-2">
+        <Button
+          variant="ghost"
+          className="p-2"
+          disabled={isCallActive} // 🔴 UI BLOCK
+        >
           <Mic className="w-5 h-5" />
         </Button>
       </PopoverTrigger>
 
       <PopoverContent className="w-72 sm:w-80 h-52 sm:h-56 flex flex-col items-center justify-center gap-4">
         <div className="flex flex-col items-center gap-2 relative w-16 h-16 sm:w-20 sm:h-20">
-          {/* Pulse background when recording */}
           {isRecording && (
             <div className="absolute inset-0 bg-red-400 opacity-50 rounded-full animate-pulse"></div>
           )}
 
-          {/* Button by state */}
           {!isRecording && !mediaBlob && (
             <Button
               onClick={startRecording}
@@ -146,7 +155,6 @@ export function VoiceMessageSender({ onVoiceSend }) {
             </Button>
           )}
 
-          {/* Duration */}
           <span className="text-base sm:text-lg font-medium text-gray-800 absolute -bottom-7 sm:bottom-[-30px]">
             {formatDuration(duration)}
           </span>

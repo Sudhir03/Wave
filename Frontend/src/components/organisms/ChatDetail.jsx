@@ -1,3 +1,5 @@
+import { useOutletContext } from "react-router-dom";
+
 /* =========================
    hooks
 ========================= */
@@ -7,7 +9,7 @@ import { useChatDetail } from "@/features/hooks";
    UI Components
 ========================= */
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/atoms/Avatar";
-import { Input } from "@/components/atoms/Input";
+import { Textarea } from "@/components/atoms/Textarea";
 import { Button } from "@/components/atoms/Button";
 
 /* =========================
@@ -24,7 +26,9 @@ import { VoicePlayer } from "@/components/molecules/media/VoicePlayer";
 import { VoiceMessageSender } from "@/components/molecules/VoiceMessageSender";
 import { ChatSearch } from "@/components/molecules/ChatSearch";
 import { MoreOptionsPopover } from "@/components/molecules/MoreOptionsPopover";
+import { CameraCaptureButton } from "@/components/molecules/CameraCaptureButton";
 import { CallPopover } from "@/components/molecules/CallPopover";
+import { MessageStatus } from "@/components/molecules/MessageStatus";
 import { formatLastSeen } from "@/lib/utils";
 
 /* =========================
@@ -32,11 +36,6 @@ import { formatLastSeen } from "@/lib/utils";
 ========================= */
 import { Send } from "lucide-react";
 
-/* =========================
-   Socket
-========================= */
-import { MessageStatus } from "../molecules/MessageStatus";
-import { useOutletContext } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 
 export default function ChatDetail() {
@@ -180,7 +179,7 @@ export default function ChatDetail() {
               {/* Text */}
               {msg.content && (
                 <div
-                  className={`max-w-xs px-3 py-2 rounded-lg ${
+                  className={`max-w-[75%] sm:max-w-xs px-3 py-2 rounded-lg wrap-break-word whitespace-pre-wrap leading-relaxed ${
                     msg.sender._id === userId
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted"
@@ -276,23 +275,32 @@ export default function ChatDetail() {
       </div>
 
       {/* ================= INPUT ================= */}
-      <div className="p-2 flex items-center gap-2">
-        <MediaPickerPopover onSelect={handleSendMedia} />
-        <EmojiPopover onSelect={(e) => setMessage(message + e)} />
-        <VoiceMessageSender onVoiceSend={(m) => handleSendMedia([m])} />
+      <div className="px-12 py-2 mb-6 flex gap-2 items-end">
+        {/* LEFT ICONS */}
+        <div className="flex items-end gap-2">
+          <CameraCaptureButton onSelect={handleSendMedia} />
+          <MediaPickerPopover onSelect={handleSendMedia} />
+          <EmojiPopover onSelect={(e) => setMessage(message + e)} />
+          <VoiceMessageSender onVoiceSend={(m) => handleSendMedia([m])} />
+        </div>
 
-        <Input
+        {/* TEXTAREA */}
+        <Textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onFocus={() => handleTyping("typing_start")}
           onBlur={() => handleTyping("typing_stop")}
           placeholder="Type a message..."
-          className="flex-1"
+          rows={1}
+          className="flex-1 resize-none overflow-y-auto max-h-24 min-h-10 leading-5 wrap-break-word whitespace-pre-wrap border border-border focus:border-2 focus:border-border focus-visible:border-border focus-visible:ring-0 focus-visible:outline-none shadow-none custom-scrollbar"
         />
 
-        <Button onClick={handleSendText} size="icon">
-          <Send className="w-5 h-5" />
-        </Button>
+        {/* SEND BUTTON (RIGHT) */}
+        <div className="flex items-end">
+          <Button onClick={handleSendText} size="icon">
+            <Send className="w-5 h-5" />
+          </Button>
+        </div>
       </div>
 
       {isGalleryOpen && (
