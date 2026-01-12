@@ -43,6 +43,7 @@ export function useWebRTCInternal() {
   const [peerCameraOn, setPeerCameraOn] = useState(true);
   const [peerMicOn, setPeerMicOn] = useState(true);
   const [localStreamVersion, setLocalStreamVersion] = useState(0);
+  const [canSwitchCamera, setCanSwitchCamera] = useState(false);
 
   // 🔑 NEW: Presence flag (caller side only)
   const [isCalleeOnline, setIsCalleeOnline] = useState(false);
@@ -379,8 +380,20 @@ export function useWebRTCInternal() {
   };
 
   //can switch camera
-  const canSwitchCamera = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  useEffect(() => {
+    const checkCameras = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = devices.filter((d) => d.kind === "videoinput");
 
+        setCanSwitchCamera(videoInputs.length > 1);
+      } catch (err) {
+        setCanSwitchCamera(false);
+      }
+    };
+
+    checkCameras();
+  }, []);
   // =========================
   // UI ONLY
   // =========================
