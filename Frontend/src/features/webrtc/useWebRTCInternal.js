@@ -29,6 +29,7 @@ export function useWebRTCInternal() {
   // =========================
   // STATE
   // =========================
+  const [callId, setCallId] = useState();
   const [selfUser, setSelfUser] = useState(null);
   const [peerUser, setPeerUser] = useState(null);
   const [callState, setCallState] = useState("idle");
@@ -111,10 +112,13 @@ export function useWebRTCInternal() {
     setIsMinimized(false);
     setIsCalleeOnline(false);
     setPeerUser(null);
+    setCallId(null);
 
     // ✅ RESET PEER MEDIA STATE
     setPeerCameraOn(true);
     setPeerMicOn(true);
+
+    setCallState("idle");
   };
 
   // =========================
@@ -128,6 +132,7 @@ export function useWebRTCInternal() {
       }
 
       // ✅ RESET PEER STATE FOR NEW CALL
+      setCallId(null);
       setPeerCameraOn(true);
       setPeerMicOn(true);
 
@@ -232,6 +237,7 @@ export function useWebRTCInternal() {
       socket.emit("webrtc_answer", {
         callerId: peerUser.id,
         answer,
+        callId,
       });
 
       setCallState("connected");
@@ -246,9 +252,12 @@ export function useWebRTCInternal() {
   // =========================
   const declineCall = () => {
     try {
-      socket.emit("webrtc_call_declined", {
-        callerId: peerUser.id,
-      });
+      if (callId) {
+        socket.emit("webrtc_call_declined", {
+          callerId: peerUser.id,
+          callId,
+        });
+      }
     } catch (error) {
       console.error("declineCall failed:", error);
     } finally {
@@ -259,10 +268,13 @@ export function useWebRTCInternal() {
 
   const endCall = ({ initiatorUserId }) => {
     try {
-      socket.emit("webrtc_call_end", {
-        targetUserId:
-          initiatorUserId === selfUser.id ? peerUser.id : selfUser.id,
-      });
+      if (callId) {
+        socket.emit("webrtc_call_end", {
+          targetUserId:
+            initiatorUserId === selfUser.id ? peerUser.id : selfUser.id,
+          callId,
+        });
+      }
     } catch (error) {
       console.error("endCall failed:", error);
     } finally {
@@ -428,7 +440,8 @@ export function useWebRTCInternal() {
     // Call Signaling Handlers
     // =========================
 
-    const onOffer = async ({ caller, offer, callType }) => {
+    const onOffer = async ({ caller, offer, callType, callId }) => {
+      setCallId(callId);
       setPeerUser(caller);
       setCallState("incoming");
       setIsVideo(callType === "video");
@@ -441,6 +454,8 @@ export function useWebRTCInternal() {
       );
       pendingCandidates.current = [];
     };
+
+    const onCallId = ({ callId }) => setCallId(callId);
 
     const onAnswer = async ({ answer }) => {
       if (!pcRef.current) return;
@@ -456,7 +471,10 @@ export function useWebRTCInternal() {
     };
 
     const onCandidate = ({ candidate }) => {
-      if (!pcRef.current) return;
+      if (!pcRef.current) {
+        pendingCandidates.current.push(candidate);
+        return;
+      }
 
       if (pcRef.current.remoteDescription) {
         pcRef.current.addIceCandidate(candidate);
@@ -507,6 +525,7 @@ export function useWebRTCInternal() {
     // =========================
 
     socket.on("webrtc_offer", onOffer);
+    socket.on("call_id", onCallId);
     socket.on("webrtc_answer", onAnswer);
     socket.on("webrtc_ice_candidate", onCandidate);
     socket.on("webrtc_call_declined", onDeclined);
@@ -520,6 +539,7 @@ export function useWebRTCInternal() {
 
     return () => {
       socket.off("webrtc_offer", onOffer);
+      socket.off("call_id", onCallId);
       socket.off("webrtc_answer", onAnswer);
       socket.off("webrtc_ice_candidate", onCandidate);
       socket.off("webrtc_call_declined", onDeclined);
@@ -574,10 +594,6 @@ export function useWebRTCInternal() {
     //toggle
     toggleMic,
     toggleCamera,
-
-    //mic
-    isMicOn,
-    isCameraOn,
 
     switchCamera,
     canSwitchCamera,
