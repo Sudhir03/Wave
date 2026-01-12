@@ -1,31 +1,7 @@
-// =======================
-// Imports – Presence (Redis)
-// =======================
 const { isUserOnline } = require("../redis/presence");
+const callService = require("../services/callService");
 
-// =======================
-// WebRTC Signaling Handlers
-// =======================
 module.exports = function registerWebRTCHandlers(io, socket) {
-  // =======================
-  // CHECK CALLEE ONLINE STATUS
-  // =======================
-  socket.on("check_user_online", async ({ calleeId }) => {
-    try {
-      const online = await isUserOnline(calleeId);
-
-      socket.emit("callee_status", {
-        calleeId,
-        online,
-      });
-    } catch (err) {
-      socket.emit("callee_status", {
-        calleeId,
-        online: false,
-      });
-    }
-  });
-
   // =======================
   // WEBRTC OFFER
   // =======================
@@ -38,73 +14,83 @@ module.exports = function registerWebRTCHandlers(io, socket) {
       return;
     }
 
-    io.to(calleeId).emit("webrtc_offer", {
-      caller, // ✅ forward caller data
-      offer,
+    // ✅ CREATE CALL (NON-BLOCKING)
+    const call = await callService.createCall({
+      callerId: socket.userId,
+      calleeId,
       callType,
     });
+
+    const callId = call._id.toString();
+
+    io.to(calleeId).emit("webrtc_offer", {
+      caller,
+      offer,
+      callType,
+      callId, // ✅ SEND callId
+    });
+
+    // ✅ SEND callId BACK TO CALLER TOO
+    socket.emit("call_id", { callId });
   });
 
   // =======================
   // WEBRTC ANSWER
   // =======================
-  socket.on("webrtc_answer", async ({ callerId, answer }) => {
+  socket.on("webrtc_answer", async ({ callerId, answer, callId }) => {
     if (!socket.userId) return;
 
-    const online = await isUserOnline(callerId);
-    if (!online) {
-      socket.emit("callee_status", { online: false });
-      return;
+    // ✅ Update DB async (do NOT block signaling)
+    if (callId) {
+      callService.answerCall({ callId }).catch(() => {});
     }
 
     io.to(callerId).emit("webrtc_answer", {
       answer,
-    });
-  });
-
-  // =======================
-  // WEBRTC ICE CANDIDATE
-  // =======================
-  socket.on("webrtc_ice_candidate", async ({ targetUserId, candidate }) => {
-    if (!socket.userId) return;
-
-    const online = await isUserOnline(targetUserId);
-    if (!online) {
-      socket.emit("callee_status", { online: false });
-      return;
-    }
-
-    io.to(targetUserId).emit("webrtc_ice_candidate", {
-      candidate,
+      callId,
     });
   });
 
   // =======================
   // WEBRTC CALL END
   // =======================
-  socket.on("webrtc_call_end", ({ targetUserId }) => {
+  socket.on("webrtc_call_end", ({ targetUserId, callId }) => {
     if (!socket.userId) return;
 
-    io.to(targetUserId).emit("webrtc_call_end");
+    if (callId) {
+      callService.endCall({ callId }).catch(() => {});
+    }
+
+    io.to(targetUserId).emit("webrtc_call_end", { callId });
   });
 
   // =======================
   // WEBRTC CALL DECLINED
   // =======================
-  socket.on("webrtc_call_declined", ({ callerId }) => {
+  socket.on("webrtc_call_declined", ({ callerId, callId }) => {
     if (!socket.userId) return;
 
-    io.to(callerId).emit("webrtc_call_declined");
+    if (callId) {
+      callService.endCall({ callId }).catch(() => {});
+    }
+
+    io.to(callerId).emit("webrtc_call_declined", { callId });
   });
 
   // =======================
-  // WEBRTC MEDIA STATE (Mic / Camera)
+  // WEBRTC ICE
   // =======================
-  socket.on("webrtc_media_state", async ({ targetUserId, cameraOn, micOn }) => {
+  socket.on("webrtc_ice_candidate", ({ targetUserId, candidate }) => {
     if (!socket.userId) return;
 
-    const online = await isUserOnline(targetUserId);
-    if (!online) return;
+    io.to(targetUserId).emit("webrtc_ice_candidate", { candidate });
+  });
+
+  // =======================
+  // MEDIA STATE
+  // =======================
+  socket.on("webrtc_media_state", ({ targetUserId, cameraOn, micOn }) => {
+    if (!socket.userId) return;
 
     io.to(targetUserId).emit("webrtc_media_state", {
       fromUserId: socket.userId,
