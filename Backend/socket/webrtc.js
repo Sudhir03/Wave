@@ -112,4 +112,19 @@ module.exports = function registerWebRTCHandlers(io, socket) {
       micOn,
     });
   });
+
+  // =======================
+  // WEBRTC CALL TYPE CHANGE (Audio <-> Video)
+  // =======================
+  socket.on("webrtc_call_type_change", async ({ targetUserId, type }) => {
+    if (!socket.userId) return;
+
+    const online = await isUserOnline(targetUserId);
+    if (!online) return;
+
+    io.to(targetUserId).emit("webrtc_call_type_change", {
+      fromUserId: socket.userId,
+      type, // "audio" | "video"
+    });
+  });
 };
