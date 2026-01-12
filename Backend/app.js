@@ -46,6 +46,7 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
   process.env.FRONTEND_PHONE_URL,
   "http://localhost:5173",
+  "https://starriest-nadine-commutual.ngrok-free.dev/",
 ];
 app.use(
   cors({
