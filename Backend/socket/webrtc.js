@@ -4,60 +4,59 @@
 const { isUserOnline } = require("../redis/presence");
 
 // =======================
+// Imports – Call Service
+// =======================
+const callService = require("../services/callService");
+
+// =======================
 // WebRTC Signaling Handlers
 // =======================
 module.exports = function registerWebRTCHandlers(io, socket) {
   // =======================
-  // CHECK CALLEE ONLINE STATUS
-  // =======================
-  socket.on("check_user_online", async ({ calleeId }) => {
-    try {
-      const online = await isUserOnline(calleeId);
-
-      socket.emit("callee_status", {
-        calleeId,
-        online,
-      });
-    } catch (err) {
-      socket.emit("callee_status", {
-        calleeId,
-        online: false,
-      });
-    }
-  });
-
-  // =======================
-  // WEBRTC OFFER
+  // WEBRTC OFFER (CALL START)
   // =======================
   socket.on("webrtc_offer", async ({ calleeId, offer, callType, caller }) => {
     if (!socket.userId) return;
 
-    const online = await isUserOnline(calleeId);
-    if (!online) {
-      socket.emit("callee_status", { online: false });
-      return;
-    }
+    const callerId = socket.userId;
+    if (!calleeId || callerId === calleeId) return;
 
+    // 1️⃣ Create call record (ALWAYS)
+    const call = await callService.createCall({
+      callerId,
+      calleeId,
+      callType,
+    });
+
+    const callId = call._id.toString();
+
+    // 2️⃣ Emit offer (best-effort)
     io.to(calleeId).emit("webrtc_offer", {
-      caller, // ✅ forward caller data
+      callId,
+      caller,
       offer,
       callType,
     });
+
+    // 3️⃣ Online check (caller UI feedback only)
+    const online = await isUserOnline(calleeId);
+    if (!online) {
+      socket.emit("callee_status", { online: false });
+    }
   });
 
   // =======================
-  // WEBRTC ANSWER
+  // WEBRTC ANSWER (CALL ACCEPT)
   // =======================
-  socket.on("webrtc_answer", async ({ callerId, answer }) => {
-    if (!socket.userId) return;
+  socket.on("webrtc_answer", async ({ callerId, callId, answer }) => {
+    if (!socket.userId || !callId) return;
 
-    const online = await isUserOnline(callerId);
-    if (!online) {
-      socket.emit("callee_status", { online: false });
-      return;
-    }
+    // 1️⃣ Mark call as connected in DB
+    await callService.answerCall({ callId });
 
+    // 2️⃣ Forward answer (best-effort)
     io.to(callerId).emit("webrtc_answer", {
+      callId,
       answer,
     });
   });
@@ -65,15 +64,10 @@ module.exports = function registerWebRTCHandlers(io, socket) {
   // =======================
   // WEBRTC ICE CANDIDATE
   // =======================
-  socket.on("webrtc_ice_candidate", async ({ targetUserId, candidate }) => {
-    if (!socket.userId) return;
+  socket.on("webrtc_ice_candidate", ({ targetUserId, candidate }) => {
+    if (!socket.userId || !targetUserId || !candidate) return;
 
-    const online = await isUserOnline(targetUserId);
-    if (!online) {
-      socket.emit("callee_status", { online: false });
-      return;
-    }
-
+    // Best-effort forward
     io.to(targetUserId).emit("webrtc_ice_candidate", {
       candidate,
     });
@@ -82,73 +76,44 @@ module.exports = function registerWebRTCHandlers(io, socket) {
   // =======================
   // WEBRTC CALL END
   // =======================
-  socket.on("webrtc_call_end", ({ targetUserId }) => {
-    if (!socket.userId) return;
+  socket.on("webrtc_call_end", async ({ targetUserId, callId }) => {
+    if (!socket.userId || !callId) return;
 
-    io.to(targetUserId).emit("webrtc_call_end");
+    // 1️⃣ End call in DB (endedAt + duration)
+    await callService.endCall({ callId });
+
+    // 2️⃣ Notify other peer (best-effort)
+    io.to(targetUserId).emit("webrtc_call_end", {
+      callId,
+    });
   });
 
   // =======================
   // WEBRTC CALL DECLINED
   // =======================
-  socket.on("webrtc_call_declined", ({ callerId }) => {
-    if (!socket.userId) return;
+  socket.on("webrtc_call_declined", async ({ callerId, callId }) => {
+    if (!socket.userId || !callId) return;
 
-    io.to(callerId).emit("webrtc_call_declined");
+    // 1️⃣ End call in DB (no connectedAt → duration 0)
+    await callService.endCall({ callId });
+
+    // 2️⃣ Notify caller (best-effort)
+    io.to(callerId).emit("webrtc_call_declined", {
+      callId,
+    });
   });
 
   // =======================
   // WEBRTC MEDIA STATE (Mic / Camera)
   // =======================
-  socket.on("webrtc_media_state", async ({ targetUserId, cameraOn, micOn }) => {
-    if (!socket.userId) return;
+  socket.on("webrtc_media_state", ({ targetUserId, cameraOn, micOn }) => {
+    if (!socket.userId || !targetUserId) return;
 
-    const online = await isUserOnline(targetUserId);
-    if (!online) return;
-
+    // Best-effort forward
     io.to(targetUserId).emit("webrtc_media_state", {
       fromUserId: socket.userId,
       cameraOn,
       micOn,
-    });
-  });
-
-  // =======================
-  // WEBRTC CALL TYPE CHANGE (Audio <-> Video)
-  // =======================
-  socket.on("webrtc_call_type_change", async ({ targetUserId, type }) => {
-    if (!socket.userId) return;
-
-    const online = await isUserOnline(targetUserId);
-    if (!online) return;
-
-    io.to(targetUserId).emit("webrtc_call_type_change", {
-      fromUserId: socket.userId,
-      type, // "audio" | "video"
-    });
-  });
-
-  // =======================
-  // WEBRTC RENEGOTIATION OFFER
-  // =======================
-  socket.on("webrtc_renegotiate_offer", ({ targetUserId, offer, type }) => {
-    if (!socket.userId) return;
-
-    io.to(targetUserId).emit("webrtc_renegotiate_offer", {
-      fromUserId: socket.userId,
-      offer,
-      type, // "audio" | "video"
-    });
-  });
-
-  // =======================
-  // WEBRTC RENEGOTIATION ANSWER
-  // =======================
-  socket.on("webrtc_renegotiate_answer", ({ targetUserId, answer }) => {
-    if (!socket.userId) return;
-
-    io.to(targetUserId).emit("webrtc_renegotiate_answer", {
-      answer,
     });
   });
 };

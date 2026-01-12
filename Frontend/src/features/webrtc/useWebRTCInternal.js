@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import socket from "../../socket";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getMyProfile } from "@/api/users";
 import { useAuth } from "@clerk/clerk-react";
 
@@ -29,10 +29,11 @@ export function useWebRTCInternal() {
   // =========================
   // STATE
   // =========================
+  const [callId, setCallId] = useState(null);
   const [selfUser, setSelfUser] = useState(null);
   const [peerUser, setPeerUser] = useState(null);
   const [callState, setCallState] = useState("idle");
-  // idle | calling | incoming | connected | ended
+  // idle | calling | ringing | incoming | connected | ended
 
   const [isVideo, setIsVideo] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -114,6 +115,7 @@ export function useWebRTCInternal() {
     setIsMinimized(false);
     setIsCalleeOnline(false);
     setPeerUser(null);
+    setCallId(null);
 
     // ✅ RESET PEER MEDIA STATE
     setPeerCameraOn(true);
@@ -142,10 +144,6 @@ export function useWebRTCInternal() {
       // ✅ RESET STATES HERE
       setIsMicOn(true);
       setIsCameraOn(video);
-
-      // 🔹 Optional: check if callee is online
-
-      socket.emit("check_user_online", { calleeId: callee.id });
 
       // 🔹 Get media
       localStreamRef.current = await navigator.mediaDevices.getUserMedia(
@@ -234,6 +232,7 @@ export function useWebRTCInternal() {
       // 🔹 Send answer back to caller
       socket.emit("webrtc_answer", {
         callerId: peerUser.id,
+        callId,
         answer,
       });
 
@@ -251,6 +250,7 @@ export function useWebRTCInternal() {
     try {
       socket.emit("webrtc_call_declined", {
         callerId: peerUser.id,
+        callId,
       });
     } catch (error) {
       console.error("declineCall failed:", error);
@@ -260,19 +260,23 @@ export function useWebRTCInternal() {
     }
   };
 
-  const endCall = ({ initiatorUserId }) => {
-    try {
-      socket.emit("webrtc_call_end", {
-        targetUserId:
-          initiatorUserId === selfUser.id ? peerUser.id : selfUser.id,
-      });
-    } catch (error) {
-      console.error("endCall failed:", error);
-    } finally {
-      cleanupCall();
-      setCallState("ended");
-    }
-  };
+  const endCall = useCallback(
+    ({ initiatorUserId }) => {
+      try {
+        socket.emit("webrtc_call_end", {
+          targetUserId:
+            initiatorUserId === selfUser.id ? peerUser.id : selfUser.id,
+          callId,
+        });
+      } catch (error) {
+        console.error("endCall failed:", error);
+      } finally {
+        cleanupCall();
+        setCallState("ended");
+      }
+    },
+    [selfUser, peerUser, callId]
+  );
 
   //mic and camera toggle
   const toggleMic = () => {
@@ -354,46 +358,62 @@ export function useWebRTCInternal() {
     const newFacingMode = currentFacingMode === "user" ? "environment" : "user";
 
     try {
+      // 1️⃣ REMOVE + STOP old camera FIRST
+      localStreamRef.current.removeTrack(oldVideoTrack);
+      oldVideoTrack.stop();
+
+      // 2️⃣ WAIT so mobile devices release camera
+      await new Promise((res) => setTimeout(res, 300));
+
+      // 3️⃣ GET new camera
       const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: newFacingMode },
+        video: { facingMode: { ideal: newFacingMode } },
+        audio: false,
       });
 
       const newVideoTrack = newStream.getVideoTracks()[0];
 
-      localStreamRef.current.removeTrack(oldVideoTrack);
-      oldVideoTrack.stop();
+      // 4️⃣ ADD new track
       localStreamRef.current.addTrack(newVideoTrack);
 
+      // 5️⃣ REPLACE track for peer
       const sender = pcRef.current
         .getSenders()
         .find((s) => s.track?.kind === "video");
 
-      await sender?.replaceTrack(newVideoTrack);
+      if (sender) {
+        await sender.replaceTrack(newVideoTrack);
+      }
 
+      // 6️⃣ UPDATE STATE + refresh preview
       setCurrentFacingMode(newFacingMode);
-
-      // 🔑 force local preview refresh
       setLocalStreamVersion((v) => v + 1);
     } catch (err) {
       console.warn("Camera switch failed:", err);
     }
   };
 
-  //can switch camera
+  //check can switch camera
+
   useEffect(() => {
     const checkCameras = async () => {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoInputs = devices.filter((d) => d.kind === "videoinput");
 
-        setCanSwitchCamera(videoInputs.length > 1);
-      } catch (err) {
+        setCanSwitchCamera(videoInputs.length > 1 && isVideo && isCameraOn);
+      } catch {
         setCanSwitchCamera(false);
       }
     };
 
+    // run when:
+    // - call connects
+    // - camera turns on/off
+    // - stream changes
     checkCameras();
-  }, []);
+  }, [isVideo, isCameraOn, localStreamVersion]);
+
   // =========================
   // UI ONLY
   // =========================
@@ -415,7 +435,8 @@ export function useWebRTCInternal() {
     // Call Signaling Handlers
     // =========================
 
-    const onOffer = async ({ caller, offer, callType }) => {
+    const onOffer = async ({ caller, offer, callType, callId }) => {
+      setCallId(callId);
       setPeerUser(caller);
       setCallState("incoming");
       setIsVideo(callType === "video");
@@ -561,10 +582,6 @@ export function useWebRTCInternal() {
     //toggle
     toggleMic,
     toggleCamera,
-
-    //mic
-    isMicOn,
-    isCameraOn,
 
     switchCamera,
     canSwitchCamera,

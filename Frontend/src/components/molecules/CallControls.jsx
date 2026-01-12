@@ -1,11 +1,18 @@
 import { IconButton } from "../atoms/IconButton";
-import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff } from "lucide-react";
+import {
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  PhoneOff,
+  RefreshCcw, // 🔁 switch call type
+} from "lucide-react";
 
 export const CallControls = ({
   isMicOn,
   isCameraOn,
   onEnd,
-  type,
+  type, // "audio" | "video"
   onToggleMic,
   onToggleCamera,
   onSwitchCamera,
@@ -16,7 +23,7 @@ export const CallControls = ({
       {/* 🎤 Mic */}
       <IconButton icon={isMicOn ? Mic : MicOff} onClick={onToggleMic} />
 
-      {/* 🎥 Camera */}
+      {/* 🎥 Camera (video only) */}
       {type === "video" && (
         <IconButton
           icon={isCameraOn ? Video : VideoOff}
@@ -24,9 +31,9 @@ export const CallControls = ({
         />
       )}
 
-      {/* 🔄 Switch camera */}
+      {/* 🔄 Switch front/back camera */}
       {type === "video" && canSwitchCamera && isCameraOn && (
-        <IconButton icon={Camera} onClick={onSwitchCamera} />
+        <IconButton icon={RefreshCcw} onClick={onSwitchCamera} />
       )}
 
       {/* ❌ End */}
