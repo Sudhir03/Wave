@@ -143,7 +143,17 @@ export default function FriendsPanel() {
   return (
     <div className="flex flex-col h-full">
       {/* ================= HEADER ================= */}
-      <div className="flex justify-between items-center bg-card sticky top-0 z-10 py-4 px-6 border-b border-border">
+      <div
+        className="
+      flex flex-col md:flex-row
+      md:justify-between md:items-center
+      gap-4
+      bg-card sticky top-0 z-10
+      py-4 px-4 md:px-6
+      border-b border-border
+    "
+      >
+        {/* LEFT */}
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
             Friends
@@ -153,6 +163,7 @@ export default function FriendsPanel() {
               </span>
             )}
           </h1>
+
           {friends.length > 0 && (
             <p className="text-xs text-muted-foreground">
               You have {friends.length} friend{friends.length > 1 ? "s" : ""}
@@ -160,19 +171,32 @@ export default function FriendsPanel() {
           )}
         </div>
 
-        <div className="flex gap-2 w-full max-w-md">
+        {/* RIGHT (Search + Button) */}
+        <div
+          className="
+        flex flex-col sm:flex-row
+        gap-2
+        w-full md:max-w-md
+      "
+        >
           <Input
             placeholder="Search friends..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="flex-1"
           />
-          <Button onClick={() => setModalOpen(true)}>Find People</Button>
+
+          <Button
+            onClick={() => setModalOpen(true)}
+            className="w-full sm:w-auto"
+          >
+            Find People
+          </Button>
         </div>
       </div>
 
       {/* ================= CONTENT ================= */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-4 custom-scrollbar">
         {/* -------- Incoming Requests -------- */}
         {friendRequests.length > 0 && (
           <div className="border rounded-lg bg-card">
@@ -183,7 +207,13 @@ export default function FriendsPanel() {
             {friendRequests.map((req) => (
               <div
                 key={req.id}
-                className="flex items-center justify-between px-4 py-3 border-b last:border-0"
+                className="
+              flex flex-col sm:flex-row
+              sm:items-center sm:justify-between
+              gap-3
+              px-4 py-3
+              border-b last:border-0
+            "
               >
                 <div className="flex items-center gap-3">
                   <Avatar>
@@ -223,7 +253,6 @@ export default function FriendsPanel() {
                     Decline
                   </Button>
 
-                  {/* ⋮ MORE → BLOCK */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -240,12 +269,10 @@ export default function FriendsPanel() {
                         className="text-destructive"
                         disabled={isBlocking}
                         onClick={() => {
-                          // 1️⃣ decline request
                           respondRequestMutate({
                             id: req.id,
                             action: "decline",
                           });
-                          // 2️⃣ block sender
                           blockUserMutate(req.senderId);
                         }}
                       >
@@ -270,7 +297,13 @@ export default function FriendsPanel() {
           <div
             key={friend._id}
             onClick={() => handleOpenChat(friend)}
-            className="flex items-center justify-between p-2 rounded hover:bg-muted cursor-pointer"
+            className="
+          flex items-center justify-between
+          p-3 md:p-2
+          rounded
+          hover:bg-muted
+          cursor-pointer
+        "
           >
             <div className="flex items-center gap-3">
               <Avatar>
@@ -300,7 +333,6 @@ export default function FriendsPanel() {
               </DropdownMenuTrigger>
 
               <DropdownMenuContent align="end">
-                {/* Unfriend */}
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();
@@ -311,7 +343,6 @@ export default function FriendsPanel() {
                   Unfriend
                 </DropdownMenuItem>
 
-                {/* Block */}
                 <DropdownMenuItem
                   className="text-destructive"
                   onClick={(e) => {

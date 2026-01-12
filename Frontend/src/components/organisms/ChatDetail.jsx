@@ -33,9 +33,14 @@ import { formatLastSeen } from "@/lib/utils";
 /* =========================
    Icons
 ========================= */
-import { Send } from "lucide-react";
+import { Grip, Send } from "lucide-react";
 
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@radix-ui/react-dropdown-menu";
 
 export default function ChatDetail() {
   /* =========================
@@ -95,18 +100,20 @@ export default function ChatDetail() {
   return (
     <div className="h-full flex flex-col pb-1">
       {/* ================= HEADER ================= */}
-      <div className="flex items-center justify-between border-b p-2.5">
-        <div className="flex items-center gap-2">
-          <Avatar className="w-12 h-12">
+      <div className="flex items-center border-b p-2.5 gap-2">
+        {/* LEFT SECTION — priority */}
+        <div className="flex items-center gap-2 flex-1 overflow-hidden">
+          <Avatar className="w-10 h-10 shrink-0">
             <AvatarImage src={chat.profileImageUrl} />
             <AvatarFallback>{chat.fullName?.charAt(0)}</AvatarFallback>
           </Avatar>
 
           <div className="flex flex-col">
-            <span className="font-semibold truncate max-w-48">
+            <span className="font-semibold whitespace-nowrap">
               {chat.fullName}
             </span>
-            <span className="text-sm text-accent">
+
+            <span className="text-sm text-accent whitespace-nowrap">
               {isTyping ? (
                 <span className="italic">typing...</span>
               ) : chat.isOnline ? (
@@ -118,49 +125,17 @@ export default function ChatDetail() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
-          <ChatSearch messages={messages} />
+        {/* RIGHT SECTION — can shrink */}
+        <div className="flex items-center gap-0 shrink">
+          {/* <ChatSearch messages={messages} /> */}
           <CallPopover type="audio" peer={chat} />
           <CallPopover type="video" peer={chat} />
-
-          <MoreOptionsPopover
-            options={
-              [
-                // {
-                //   label: pinnedUsers.some(
-                //     (p) => p.conversationId === activeChat.conversationId
-                //   )
-                //     ? "Unpin"
-                //     : "Pin",
-                //   icon: {
-                //     component: pinnedUsers.some(
-                //       (p) => p.conversationId === activeChat.conversationId
-                //     )
-                //       ? PinOff
-                //       : Pin,
-                //   },
-                //   onClick: () =>
-                //     pinnedUsers.some(
-                //       (p) => p.conversationId === activeChat.conversationId
-                //     )
-                //       ? removePin(activeChat.conversationId)
-                //       : addPin(activeChat),
-                // },
-                // {
-                //   label: mutedUsers.includes(activeChat.conversationId)
-                //     ? "Unmute"
-                //     : "Mute",
-                //   icon: { component: BellOff },
-                //   onClick: () => toggleMute(activeChat),
-                // },
-              ]
-            }
-          />
+          <MoreOptionsPopover options={[]} />
         </div>
       </div>
 
       {/* ================= MESSAGES ================= */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-2">
         <div ref={topRef} />
 
         {messages.map((msg, i) => {
@@ -175,10 +150,10 @@ export default function ChatDetail() {
                 msg.sender._id === userId ? "items-end" : "items-start"
               }`}
             >
-              {/* Text */}
+              {/* TEXT */}
               {msg.content && (
                 <div
-                  className={`max-w-[75%] sm:max-w-xs px-3 py-2 rounded-lg wrap-break-word whitespace-pre-wrap leading-relaxed ${
+                  className={`max-w-[90%] sm:max-w-[75%] md:max-w-xs px-3 py-2 rounded-lg break-words whitespace-pre-wrap leading-relaxed ${
                     msg.sender._id === userId
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted"
@@ -188,10 +163,10 @@ export default function ChatDetail() {
                 </div>
               )}
 
-              {/* Media */}
+              {/* MEDIA */}
               {msg.media?.length > 0 && (
                 <>
-                  <div className="mt-1 flex gap-2 flex-wrap">
+                  <div className="mt-1 flex gap-1 sm:gap-2 flex-wrap">
                     {msg.media
                       .filter((m) => m.type === "image" || m.type === "video")
                       .slice(0, 5)
@@ -255,7 +230,7 @@ export default function ChatDetail() {
                 </>
               )}
 
-              {/* Time + Status */}
+              {/* TIME + STATUS */}
               {showTime && (
                 <div className="flex items-center gap-1 mt-1">
                   <span className="text-xs text-muted-foreground">
@@ -274,12 +249,34 @@ export default function ChatDetail() {
       </div>
 
       {/* ================= INPUT ================= */}
-      <div className="px-12 py-2 mb-6 flex gap-2 items-end">
-        {/* LEFT ICONS */}
-        <div className="flex items-end gap-2">
+      {/* ================= INPUT ================= */}
+      <div className="px-2 sm:px-12 py-2 mb-4 sm:mb-6 flex gap-2 items-end">
+        {/* LEFT ICONS — DESKTOP */}
+        <div className="hidden sm:flex items-end gap-1 sm:gap-2 shrink-0">
           <MediaPickerPopover onSelect={handleSendMedia} />
           <EmojiPopover onSelect={(e) => setMessage(message + e)} />
           <VoiceMessageSender onVoiceSend={(m) => handleSendMedia([m])} />
+        </div>
+
+        {/* LEFT ICONS — MOBILE */}
+        <div className="flex sm:hidden items-end shrink-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-11 w-11">
+                <Grip className="!w-7 !h-7" />
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent
+              align="start"
+              side="top"
+              className="bg-background border border-border rounded-md p-2 flex gap-2"
+            >
+              <MediaPickerPopover onSelect={handleSendMedia} />
+              <EmojiPopover onSelect={(e) => setMessage(message + e)} />
+              <VoiceMessageSender onVoiceSend={(m) => handleSendMedia([m])} />
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* TEXTAREA */}
@@ -290,12 +287,16 @@ export default function ChatDetail() {
           onBlur={() => handleTyping("typing_stop")}
           placeholder="Type a message..."
           rows={1}
-          className="flex-1 resize-none overflow-y-auto max-h-24 min-h-10 leading-5 wrap-break-word whitespace-pre-wrap border border-border focus:border-2 focus:border-border focus-visible:border-border focus-visible:ring-0 focus-visible:outline-none shadow-none custom-scrollbar"
+          className="flex-1 resize-none overflow-y-auto max-h-24 min-h-10 leading-5 text-sm sm:text-base break-words whitespace-pre-wrap border border-border focus:border-2 focus:border-border focus-visible:ring-0 focus-visible:outline-none shadow-none custom-scrollbar"
         />
 
-        {/* SEND BUTTON (RIGHT) */}
-        <div className="flex items-end">
-          <Button onClick={handleSendText} size="icon">
+        {/* SEND BUTTON */}
+        <div className="flex items-end shrink-0">
+          <Button
+            onClick={handleSendText}
+            size="icon"
+            className="h-10 w-10 sm:h-10 sm:w-10"
+          >
             <Send className="w-5 h-5" />
           </Button>
         </div>

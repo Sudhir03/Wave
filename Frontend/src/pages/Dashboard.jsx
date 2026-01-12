@@ -1,10 +1,14 @@
 import ProfileSidebar from "@/components/organisms/ProfileSidebar";
 import { useEffect, useRef } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 
 export default function Dashboard() {
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // ✅ Correct logic
+  const isRootDashboard = location.pathname === "/dashboard";
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -14,25 +18,39 @@ export default function Dashboard() {
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [navigate]);
 
   return (
-    // Full-screen dark overlay
     <div className="fixed inset-0 z-50 bg-black/50">
-      {/* Modal box anchored bottom-left */}
       <div
         ref={dropdownRef}
-        className="absolute bottom-2 left-2 flex bg-card px-2 text-card-foreground w-[600px] h-[600px] rounded-md shadow-lg overflow-hidden"
+        className="
+          absolute bottom-2 left-2
+          bg-card text-card-foreground shadow-lg overflow-hidden
+          w-full h-full
+          sm:w-[600px] sm:h-[600px] sm:rounded-md
+          sm:flex
+        "
       >
-        {/* Sidebar */}
-        <ProfileSidebar />
+        {/* SIDEBAR */}
+        <div
+          className={`
+            sm:block
+            ${isRootDashboard ? "block" : "hidden"}
+          `}
+        >
+          <ProfileSidebar />
+        </div>
 
-        {/* Main content */}
-        <div className="h-full w-full">
+        {/* CONTENT */}
+        <div
+          className={`
+            flex-1
+            sm:block
+            ${isRootDashboard ? "hidden" : "block"}
+          `}
+        >
           <Outlet />
         </div>
       </div>

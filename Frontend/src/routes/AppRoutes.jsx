@@ -44,6 +44,7 @@ const router = createBrowserRouter([
         element: <Dashboard />,
         children: [
           { index: true, element: <Account /> },
+          { path: "account", element: <Account /> },
           { path: "notification", element: <Notification /> },
           { path: "personalization", element: <Personalization /> },
           { path: "blocked", element: <BlockedUsersList /> },

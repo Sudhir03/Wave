@@ -251,8 +251,16 @@ export default function ChatWindow() {
   // =======================
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Left Panel */}
-      <div className="w-80 border-r-2 border-border flex flex-col">
+      {/* ================= LEFT PANEL ================= */}
+      <div
+        className={`
+        w-full md:w-80
+        border-r-2 border-border
+        flex flex-col
+        ${chatId ? "hidden md:flex" : "flex"}
+      `}
+      >
+        {/* Search */}
         <div className="p-4">
           <Input
             placeholder="Search chats..."
@@ -261,6 +269,7 @@ export default function ChatWindow() {
           />
         </div>
 
+        {/* Chat list */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
           {/* Pinned */}
           {pinnedChats.length > 0 && (
@@ -273,7 +282,7 @@ export default function ChatWindow() {
                 {pinnedChats.map((chat, i) => (
                   <div
                     key={chat.conversationId}
-                    className="relative group pt-1 pr-1"
+                    className="relative group pt-1 pr-1 shrink-0"
                   >
                     <NavLink
                       to={`/chat/${chat.conversationId}`}
@@ -298,14 +307,14 @@ export default function ChatWindow() {
                         togglePin(chat.conversationId);
                       }}
                       className="
-              absolute top-1 right-2
-              translate-x-1/3 -translate-y-1/3
-              h-5 w-5 rounded-full
-              bg-destructive text-white text-xs
-              flex items-center justify-center
-              opacity-0 group-hover:opacity-100
-              transition-opacity
-            "
+                      absolute top-1 right-2
+                      translate-x-1/3 -translate-y-1/3
+                      h-5 w-5 rounded-full
+                      bg-destructive text-white text-xs
+                      flex items-center justify-center
+                      opacity-0 group-hover:opacity-100
+                      transition-opacity
+                    "
                     >
                       ✕
                     </button>
@@ -315,176 +324,147 @@ export default function ChatWindow() {
             </div>
           )}
 
-          {/* Chats Header */}
           {allChats.length > 0 && (
             <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground">
               Chats ({allChats.length})
             </div>
           )}
 
-          {/* Chat List */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
-            {isLoading && <Spinner />}
+          {isLoading && <Spinner />}
 
-            {!isLoading && allChats.length === 0 && (
-              <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground px-6">
-                <p className="text-sm font-medium mb-1">No chats yet</p>
-                <p className="text-xs">Add a friend to start a conversation</p>
-              </div>
-            )}
-
-            {allChats.map((chat, i) => (
-              <NavLink
-                key={chat.conversationId}
-                to={`/chat/${chat.conversationId}`}
-                className={({ isActive }) =>
-                  `flex items-center p-3 rounded-md hover:bg-accent/10 ${
-                    isActive ? "bg-accent/20" : ""
-                  }`
-                }
-              >
-                <Avatar>
-                  <AvatarImage src={chat.partner.profileImageUrl} />
-                  <AvatarFallback className={getAvatarGradient(i)}>
-                    {chat.partner.fullName[0]}
-                  </AvatarFallback>
-                </Avatar>
-
-                <div className="ml-3 flex-1 min-w-0">
-                  <div className="flex justify-between">
-                    <span className="truncate font-medium">
-                      {chat.partner.fullName}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {chat.lastMessage?.timestamp
-                        ? formatLastSeen(chat.lastMessage.timestamp)
-                        : ""}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm truncate text-muted-foreground">
-                      {chat.lastMessage?.content || "No messages"}
-                    </span>
-
-                    <div className="flex items-center gap-2">
-                      {isMuted(chat.conversationId) && (
-                        <VolumeX className="w-4 h-4" />
-                      )}
-                      {chat.unreadCount > 0 && (
-                        <span className="bg-green-500 text-white text-xs px-2 rounded-full">
-                          {chat.unreadCount}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => e.preventDefault()}
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-
-                  <DropdownMenuContent
-                    align="end"
-                    className="bg-background border border-border shadow-md rounded-md p-1 space-y-1"
-                  >
-                    <DropdownMenuItem
-                      onClick={() => togglePin(chat.conversationId)}
-                      className="px-3 py-2 rounded-sm outline-none focus:outline-none focus:ring-0 focus:ring-offset-0 data-highlighted:bg-accent/20 data-highlighted:border-transparent"
-                    >
-                      <div className="flex items-center gap-2 text-sm">
-                        {isPinned(chat.conversationId) ? (
-                          <>
-                            <PinOff size={14} />
-                            <span>Unpin</span>
-                          </>
-                        ) : (
-                          <>
-                            <Pin size={14} />
-                            <span>Pin</span>
-                          </>
-                        )}
-                      </div>
-                    </DropdownMenuItem>
-
-                    <DropdownMenuItem
-                      onClick={() => toggleMute(chat.conversationId)}
-                      className="px-3 py-2 rounded-sm outline-none focus:outline-none focus:ring-0 focus:ring-offset-0 data-highlighted:bg-accent/20 data-highlighted:border-transparent"
-                    >
-                      <div className="flex items-center gap-2 text-sm">
-                        {isMuted(chat.conversationId) ? (
-                          <>
-                            <Volume size={14} />
-                            <span>Unmute</span>
-                          </>
-                        ) : (
-                          <>
-                            <VolumeX size={14} />
-                            <span>Mute</span>
-                          </>
-                        )}
-                      </div>
-                    </DropdownMenuItem>
-
-                    <DropdownMenuItem
-                      onClick={() => deleteChat(chat.conversationId)}
-                      className="px-3 py-2 rounded-sm outline-none focus:outline-none focus:ring-0 focus:ring-offset-0 data-highlighted:bg-accent/20 data-highlighted:border-transparent"
-                    >
-                      <div className="flex items-center gap-2 text-sm">
-                        <Trash2 size={14} />
-                        <span>Delete</span>
-                      </div>
-                    </DropdownMenuItem>
-
-                    {chatId === chat.conversationId && (
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.preventDefault();
-                          navigate("..", { replace: true });
-                        }}
-                        className="px-3 py-2 rounded-sm outline-none focus:outline-none focus:ring-0 focus:ring-offset-0 data-highlighted:bg-accent/20 data-highlighted:border-transparent"
-                      >
-                        <div className="flex items-center gap-2 text-sm">
-                          <X size={14} />
-                          <span>Close chat</span>
-                        </div>
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </NavLink>
-            ))}
-
-            {hasNextPage && (
-              <div ref={loadMoreRef} className="text-center py-3">
-                {isFetchingNextPage && <Spinner />}
-              </div>
-            )}
-          </div>
-
-          {hasNextPage && (
-            <div ref={loadMoreRef} className="text-center py-3">
-              {isFetchingNextPage && <Spinner />}
+          {!isLoading && allChats.length === 0 && (
+            <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground px-6">
+              <p className="text-sm font-medium mb-1">No chats yet</p>
+              <p className="text-xs">Add a friend to start a conversation</p>
             </div>
           )}
+
+          {allChats.map((chat, i) => (
+            <div
+              key={i}
+              role="button"
+              onClick={() => navigate(`/chat/${chat.conversationId}`)}
+              className={`flex items-center p-3 rounded-md cursor-pointer hover:bg-accent/10 ${
+                chatId === chat.conversationId ? "bg-accent/20" : ""
+              }`}
+            >
+              <Avatar>
+                <AvatarImage src={chat.partner.profileImageUrl} />
+                <AvatarFallback className={getAvatarGradient(i)}>
+                  {chat.partner.fullName[0]}
+                </AvatarFallback>
+              </Avatar>
+
+              <div className="ml-3 flex-1 min-w-0">
+                <div className="flex justify-between">
+                  <span className="truncate font-medium">
+                    {chat.partner.fullName}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {chat.lastMessage?.timestamp
+                      ? formatLastSeen(chat.lastMessage.timestamp)
+                      : ""}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-sm truncate text-muted-foreground">
+                    {chat.lastMessage?.content || "No messages"}
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    {isMuted(chat.conversationId) && (
+                      <VolumeX className="w-4 h-4" />
+                    )}
+                    {chat.unreadCount > 0 && (
+                      <span className="bg-green-500 text-white text-xs px-2 rounded-full">
+                        {chat.unreadCount}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 🔥 THREE DOT MENU (PRESERVED) */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation(); // 🔥 REQUIRED
+                    }}
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent
+                  align="end"
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="bg-background border border-border shadow-md rounded-md p-1 space-y-1"
+                >
+                  <DropdownMenuItem
+                    onClick={() => togglePin(chat.conversationId)}
+                  >
+                    {isPinned(chat.conversationId) ? (
+                      <div className="flex items-center gap-2 text-sm">
+                        <PinOff size={14} /> Unpin
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Pin size={14} /> Pin
+                      </div>
+                    )}
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    onClick={() => toggleMute(chat.conversationId)}
+                  >
+                    {isMuted(chat.conversationId) ? (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Volume size={14} /> Unmute
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-sm">
+                        <VolumeX size={14} /> Mute
+                      </div>
+                    )}
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    onClick={() => deleteChat(chat.conversationId)}
+                  >
+                    <div className="flex items-center gap-2 text-sm">
+                      <Trash2 size={14} /> Delete
+                    </div>
+                  </DropdownMenuItem>
+
+                  {chatId === chat.conversationId && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.preventDefault();
+                        navigate("..", { replace: true });
+                      }}
+                    >
+                      <div className="flex items-center gap-2 text-sm">
+                        <X size={14} /> Close chat
+                      </div>
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Right Panel */}
-      <div className="flex-1">
+      {/* ================= RIGHT PANEL ================= */}
+      <div className={`${chatId ? "block" : "hidden md:block"} flex-1`}>
         {chatId || friendId ? (
-          <Outlet
-            context={{
-              activeChat,
-            }}
-          />
+          <Outlet context={{ activeChat }} />
         ) : (
           <EmptyChatScreen />
         )}
