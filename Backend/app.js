@@ -45,6 +45,7 @@ const limiter = rateLimit({
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   process.env.FRONTEND_PHONE_URL,
+  "http://localhost:5173",
 ];
 app.use(
   cors({
