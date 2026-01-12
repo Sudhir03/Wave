@@ -53,9 +53,17 @@ export const CallHistoryPage = () => {
   };
 
   return (
-    <div className="flex flex-col h-full p-4 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border pb-2">
+    <div className="flex flex-col h-full p-3 md:p-4 space-y-4">
+      {/* ================= HEADER ================= */}
+      <div
+        className="
+      flex flex-col sm:flex-row
+      sm:items-center sm:justify-between
+      gap-3
+      border-b border-border pb-2
+    "
+      >
+        {/* Left */}
         <div className="flex items-center gap-3">
           <Avatar className="w-10 h-10 rounded cursor-pointer">
             <AvatarImage src={contact.img} />
@@ -67,19 +75,29 @@ export const CallHistoryPage = () => {
               {contact.name.charAt(0)}
             </AvatarFallback>
           </Avatar>
-          <h2 className="text-lg font-semibold">{contact.name}</h2>
+
+          <h2 className="text-lg font-semibold truncate">{contact.name}</h2>
         </div>
 
-        {/* Voice & Video Buttons */}
-        <div className="flex gap-2">
+        {/* Right – Call buttons */}
+        <div className="flex gap-2 self-end sm:self-auto">
           <button
-            className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 cursor-pointer"
+            className="
+          p-2 rounded-full
+          bg-gray-200 hover:bg-gray-300
+          cursor-pointer
+        "
             onClick={() => openModal("voice")}
           >
             <Phone className="w-5 h-5" />
           </button>
+
           <button
-            className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 cursor-pointer"
+            className="
+          p-2 rounded-full
+          bg-gray-200 hover:bg-gray-300
+          cursor-pointer
+        "
             onClick={() => openModal("video")}
           >
             <Video className="w-5 h-5" />
@@ -87,7 +105,7 @@ export const CallHistoryPage = () => {
         </div>
       </div>
 
-      {/* Call History */}
+      {/* ================= CALL HISTORY ================= */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         {history.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-6">
@@ -98,9 +116,18 @@ export const CallHistoryPage = () => {
             {history.map((call, index) => (
               <li
                 key={index}
-                className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-accent/10 transition-colors"
+                className="
+              flex flex-col sm:flex-row
+              sm:items-center sm:justify-between
+              gap-2
+              p-3
+              rounded-lg
+              border border-border
+              hover:bg-accent/10
+              transition-colors
+            "
               >
-                {/* Left side: icon + date */}
+                {/* Left side */}
                 <div className="flex items-center gap-2">
                   {call.type === "voice" ? (
                     <Phone className="w-5 h-5 text-green-500" />
@@ -109,6 +136,7 @@ export const CallHistoryPage = () => {
                   ) : (
                     <XCircle className="w-5 h-5 text-red-400" />
                   )}
+
                   <span className="text-sm text-muted-foreground">
                     {new Date(call.date).toLocaleString([], {
                       dateStyle: "medium",
@@ -117,8 +145,8 @@ export const CallHistoryPage = () => {
                   </span>
                 </div>
 
-                {/* Right side: duration */}
-                <span className="text-xs font-medium text-gray-500">
+                {/* Right side */}
+                <span className="text-xs font-medium text-gray-500 self-end sm:self-auto">
                   {call.duration}
                 </span>
               </li>
@@ -127,7 +155,7 @@ export const CallHistoryPage = () => {
         )}
       </div>
 
-      {/* Modal with conditional rendering */}
+      {/* ================= MODAL ================= */}
       {isModalOpen && (
         <div
           className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"
@@ -142,14 +170,6 @@ export const CallHistoryPage = () => {
                 onEnd={closeModal}
               />
             )}
-            {/* {callType === "video" && (
-              <VideoCallWindow
-                callerName="Sarah Connor"
-                localVideoSrc="https://www.w3schools.com/html/mov_bbb.mp4"
-                remoteVideoSrc="https://www.w3schools.com/html/movie.mp4"
-                onEnd={closeModal}
-              />
-            )} */}
           </div>
         </div>
       )}

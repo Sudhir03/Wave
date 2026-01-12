@@ -22,12 +22,12 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="relative">
-      <div className="flex flex-col items-center w-20 pt-4 space-y-6 pb-4 bg-card text-card-foreground relative h-full">
-        {/* Top Logo */}
+    <div className="h-full shrink-0">
+      <div className="flex flex-col items-center w-16 sm:w-20 pt-4 pb-4 space-y-6 bg-card text-card-foreground h-full border-r border-border">
+        {/* Logo */}
         <Logo />
 
-        {/* Nav Icons */}
+        {/* Navigation */}
         <nav className="flex flex-col flex-grow gap-4">
           {links.map(({ to, icon: Icon }) => {
             const isActive = isActiveLink(to);
@@ -43,17 +43,17 @@ export default function Sidebar() {
                       : "text-muted-foreground"
                   } transition-colors`}
                 >
-                  <Icon className="!h-5 !w-5 stroke-current" />
+                  <Icon className="h-5 w-5" />
                 </Button>
               </NavLink>
             );
           })}
         </nav>
 
-        {/* Avatar at bottom */}
-        <div className="mt-auto relative">
+        {/* Avatar */}
+        <div className="mt-auto">
           <Avatar
-            className="w-10 h-10 rounded cursor-pointer"
+            className="w-9 h-9 sm:w-10 sm:h-10 cursor-pointer"
             onClick={() => navigate("/dashboard")}
           >
             <AvatarImage />
