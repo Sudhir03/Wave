@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import socket from "../../socket";
-import { useQuery } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { getMyProfile } from "@/api/users";
 import { useAuth } from "@clerk/clerk-react";
 
@@ -107,7 +107,6 @@ export function useWebRTCInternal() {
     remoteStreamRef.current = null;
 
     setHasLocalStream(false);
-    setHasRemoteStream(false);
     setIsVideo(false);
     setIsMinimized(false);
     setIsCalleeOnline(false);
@@ -575,6 +574,10 @@ export function useWebRTCInternal() {
     //toggle
     toggleMic,
     toggleCamera,
+
+    //mic
+    isMicOn,
+    isCameraOn,
 
     switchCamera,
     canSwitchCamera,
