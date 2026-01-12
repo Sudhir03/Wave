@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import socket from "../../socket";
 import { useQuery } from "@tanstack/react-query";
 import { getMyProfile } from "@/api/users";
@@ -29,16 +29,14 @@ export function useWebRTCInternal() {
   // =========================
   // STATE
   // =========================
-  const [callId, setCallId] = useState(null);
   const [selfUser, setSelfUser] = useState(null);
   const [peerUser, setPeerUser] = useState(null);
   const [callState, setCallState] = useState("idle");
-  // idle | calling | ringing | incoming | connected | ended
+  // idle | calling | incoming | connected | ended
 
   const [isVideo, setIsVideo] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [hasLocalStream, setHasLocalStream] = useState(false);
-  const [hasRemoteStream, setHasRemoteStream] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
   const [peerCameraOn, setPeerCameraOn] = useState(true);
@@ -82,7 +80,6 @@ export function useWebRTCInternal() {
     pc.ontrack = (e) => {
       if (!remoteStreamRef.current) {
         remoteStreamRef.current = new MediaStream();
-        setHasRemoteStream(true);
       }
 
       const alreadyAdded = remoteStreamRef.current
@@ -115,7 +112,6 @@ export function useWebRTCInternal() {
     setIsMinimized(false);
     setIsCalleeOnline(false);
     setPeerUser(null);
-    setCallId(null);
 
     // ✅ RESET PEER MEDIA STATE
     setPeerCameraOn(true);
@@ -144,6 +140,10 @@ export function useWebRTCInternal() {
       // ✅ RESET STATES HERE
       setIsMicOn(true);
       setIsCameraOn(video);
+
+      // 🔹 Optional: check if callee is online
+
+      socket.emit("check_user_online", { calleeId: callee.id });
 
       // 🔹 Get media
       localStreamRef.current = await navigator.mediaDevices.getUserMedia(
@@ -232,7 +232,6 @@ export function useWebRTCInternal() {
       // 🔹 Send answer back to caller
       socket.emit("webrtc_answer", {
         callerId: peerUser.id,
-        callId,
         answer,
       });
 
@@ -250,7 +249,6 @@ export function useWebRTCInternal() {
     try {
       socket.emit("webrtc_call_declined", {
         callerId: peerUser.id,
-        callId,
       });
     } catch (error) {
       console.error("declineCall failed:", error);
@@ -260,23 +258,19 @@ export function useWebRTCInternal() {
     }
   };
 
-  const endCall = useCallback(
-    ({ initiatorUserId }) => {
-      try {
-        socket.emit("webrtc_call_end", {
-          targetUserId:
-            initiatorUserId === selfUser.id ? peerUser.id : selfUser.id,
-          callId,
-        });
-      } catch (error) {
-        console.error("endCall failed:", error);
-      } finally {
-        cleanupCall();
-        setCallState("ended");
-      }
-    },
-    [selfUser, peerUser, callId]
-  );
+  const endCall = ({ initiatorUserId }) => {
+    try {
+      socket.emit("webrtc_call_end", {
+        targetUserId:
+          initiatorUserId === selfUser.id ? peerUser.id : selfUser.id,
+      });
+    } catch (error) {
+      console.error("endCall failed:", error);
+    } finally {
+      cleanupCall();
+      setCallState("ended");
+    }
+  };
 
   //mic and camera toggle
   const toggleMic = () => {
@@ -435,8 +429,7 @@ export function useWebRTCInternal() {
     // Call Signaling Handlers
     // =========================
 
-    const onOffer = async ({ caller, offer, callType, callId }) => {
-      setCallId(callId);
+    const onOffer = async ({ caller, offer, callType }) => {
       setPeerUser(caller);
       setCallState("incoming");
       setIsVideo(callType === "video");
