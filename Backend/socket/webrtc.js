@@ -127,4 +127,28 @@ module.exports = function registerWebRTCHandlers(io, socket) {
       type, // "audio" | "video"
     });
   });
+
+  // =======================
+  // WEBRTC RENEGOTIATION OFFER
+  // =======================
+  socket.on("webrtc_renegotiate_offer", ({ targetUserId, offer, type }) => {
+    if (!socket.userId) return;
+
+    io.to(targetUserId).emit("webrtc_renegotiate_offer", {
+      fromUserId: socket.userId,
+      offer,
+      type, // "audio" | "video"
+    });
+  });
+
+  // =======================
+  // WEBRTC RENEGOTIATION ANSWER
+  // =======================
+  socket.on("webrtc_renegotiate_answer", ({ targetUserId, answer }) => {
+    if (!socket.userId) return;
+
+    io.to(targetUserId).emit("webrtc_renegotiate_answer", {
+      answer,
+    });
+  });
 };
