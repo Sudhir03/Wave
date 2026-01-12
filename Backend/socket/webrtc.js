@@ -3,6 +3,8 @@
 // =======================
 const { isUserOnline } = require("../redis/presence");
 
+const callService = require("../services/callService");
+
 // =======================
 // WebRTC Signaling Handlers
 // =======================
@@ -31,6 +33,8 @@ module.exports = function registerWebRTCHandlers(io, socket) {
   // =======================
   socket.on("webrtc_offer", async ({ calleeId, offer, callType, caller }) => {
     if (!socket.userId) return;
+    const callerId = socket.userId;
+    if (!calleeId || callerId === calleeId) return;
 
     const online = await isUserOnline(calleeId);
     if (!online) {
@@ -38,18 +42,32 @@ module.exports = function registerWebRTCHandlers(io, socket) {
       return;
     }
 
-    io.to(calleeId).emit("webrtc_offer", {
-      caller, // ✅ forward caller data
-      offer,
+    const call = await callService.createCall({
+      callerId,
+      calleeId,
       callType,
     });
+
+    const callId = call._id.toString();
+
+    io.to(calleeId).emit("webrtc_offer", {
+      caller,
+      offer,
+      callType,
+      callId,
+    });
+
+    socket.emit("call_id", { callId });
   });
 
   // =======================
   // WEBRTC ANSWER
   // =======================
-  socket.on("webrtc_answer", async ({ callerId, answer }) => {
+  socket.on("webrtc_answer", async ({ callerId, answer, callId }) => {
     if (!socket.userId) return;
+
+    // Mark call as connected in DB
+    callService.answerCall({ callId }).catch(() => {});
 
     const online = await isUserOnline(callerId);
     if (!online) {
@@ -82,17 +100,22 @@ module.exports = function registerWebRTCHandlers(io, socket) {
   // =======================
   // WEBRTC CALL END
   // =======================
-  socket.on("webrtc_call_end", ({ targetUserId }) => {
+  socket.on("webrtc_call_end", async ({ targetUserId, callId }) => {
     if (!socket.userId) return;
 
+    // End call in DB (endedAt + duration)
+    callService.endCall({ callId }).catch(() => {});
     io.to(targetUserId).emit("webrtc_call_end");
   });
 
   // =======================
   // WEBRTC CALL DECLINED
   // =======================
-  socket.on("webrtc_call_declined", ({ callerId }) => {
+  socket.on("webrtc_call_declined", async ({ callerId, callId }) => {
     if (!socket.userId) return;
+
+    // End call in DB (no connectedAt → duration 0)
+    callService.endCall({ callId }).catch(() => {});
 
     io.to(callerId).emit("webrtc_call_declined");
   });

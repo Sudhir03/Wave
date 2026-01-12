@@ -1,4 +1,3 @@
-import { MicOff } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "../atoms/Avatar";
 
 const AvatarWithPulse = ({ peer, pulse = false, size = "lg" }) => {
@@ -38,41 +37,46 @@ export const CallBackground = ({
   hasRemoteStream,
   isCameraOn,
   peerCameraOn = true,
-  peerMicOn = true,
   localVideoRef,
   remoteVideoRef,
 }) => {
+  // ✅ ONLY calling + ringing
+  const isLocalPreviewPhase =
+    callState === "calling" || callState === "ringing";
+
   const showPulse =
-    callState === "calling" ||
-    callState === "ringing" ||
+    (!isVideo && callState !== "connected") ||
+    isLocalPreviewPhase ||
     callState === "incoming";
 
-  const showAvatar =
-    !isVideo ||
-    !peerCameraOn ||
-    callState === "ringing" ||
-    callState === "incoming";
+  const showAvatar = !isVideo || !peerCameraOn || callState === "incoming";
 
   return (
     <div className="absolute inset-0 bg-black overflow-hidden">
-      {/* ================= REMOTE VIDEO ================= */}
-      <video
-        ref={remoteVideoRef}
-        autoPlay
-        playsInline
-        className={`absolute inset-0 w-full h-full object-cover ${
-          !isVideo || !hasRemoteStream || !peerCameraOn ? "hidden" : ""
-        }`}
-      />
-
-      {/* ================= PEER MIC OFF (VIDEO CALL) ================= */}
-      {isVideo && hasRemoteStream && peerCameraOn && !peerMicOn && (
-        <div className="absolute top-4 left-42 px-3 py-1 rounded-full text-xs z-50 flex items-center justify-center">
-          <MicOff className="w-4 h-4 text-white" />
-        </div>
+      {/* ================= FULLSCREEN VIDEO ================= */}
+      {isVideo && (
+        <video
+          ref={
+            callState === "connected" && hasRemoteStream && peerCameraOn
+              ? remoteVideoRef
+              : isLocalPreviewPhase
+              ? localVideoRef
+              : null
+          }
+          autoPlay
+          muted={callState !== "connected"} // 🔇 local preview muted
+          playsInline
+          className={`absolute inset-0 w-full h-full object-cover ${
+            (!isLocalPreviewPhase && callState !== "connected") ||
+            (!isCameraOn && isLocalPreviewPhase) ||
+            (callState === "connected" && !peerCameraOn)
+              ? "hidden"
+              : ""
+          }`}
+        />
       )}
 
-      {/* ================= AVATAR UI (AUDIO OR CAMERA OFF) ================= */}
+      {/* ================= AVATAR UI ================= */}
       {showAvatar && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-slate-900 via-neutral-900 to-black">
           <AvatarWithPulse peer={peer} pulse={showPulse} />
@@ -86,25 +90,23 @@ export const CallBackground = ({
           <p className="mt-2 text-xs tracking-wide text-slate-400">
             {callState === "incoming" ? "Incoming call" : callState}
           </p>
-
-          {!peerMicOn && (
-            <div className="absolute top-4 left-42 px-3 py-1 rounded-full text-xs z-50 flex items-center justify-center">
-              <MicOff className="w-4 h-4 text-white" />
-            </div>
-          )}
         </div>
       )}
 
       {/* ================= LOCAL VIDEO PiP ================= */}
-      {callState === "connected" && hasLocalStream && isCameraOn && isVideo && (
-        <video
-          ref={localVideoRef}
-          autoPlay
-          muted
-          playsInline
-          className="absolute bottom-4 right-4 w-36 h-48 rounded-xl object-cover border border-white/20"
-        />
-      )}
+      {callState === "connected" &&
+        hasLocalStream &&
+        isCameraOn &&
+        isVideo &&
+        hasRemoteStream && (
+          <video
+            ref={localVideoRef}
+            autoPlay
+            muted
+            playsInline
+            className="absolute bottom-4 right-4 w-36 h-48 rounded-xl object-cover border border-white/20"
+          />
+        )}
     </div>
   );
 };

@@ -21,6 +21,7 @@ const chatRoutes = require("./routes/chatRoutes");
 const conversationRoutes = require("./routes/conversationRoutes");
 const conversationPreferenceRoutes = require("./routes/conversationPreferenceRoutes");
 const blockRoutes = require("./routes/blockRoutes");
+const callRoutes = require("./routes/callRoutes");
 
 const app = express();
 
@@ -45,6 +46,8 @@ const limiter = rateLimit({
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   process.env.FRONTEND_PHONE_URL,
+  "http://localhost:5173",
+  "https://starriest-nadine-commutual.ngrok-free.dev",
 ];
 app.use(
   cors({
@@ -95,6 +98,7 @@ app.use("/api/chats", chatRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/conversation-preferences", conversationPreferenceRoutes);
 app.use("/api/block", blockRoutes);
+app.use("/api/calls", callRoutes);
 
 // =======================
 // 404 Handler

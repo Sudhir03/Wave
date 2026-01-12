@@ -131,7 +131,6 @@ export const CallScreen = () => {
         isCameraOn={isCameraOn}
         isMicOn={isMicOn}
         peerCameraOn={peerCameraOn} // 👈 ADD
-        peerMicOn={peerMicOn} // 👈 ADD
         localVideoRef={localVideoRef}
         remoteVideoRef={remoteVideoRef}
       />
@@ -141,6 +140,7 @@ export const CallScreen = () => {
         isVideo={isVideo}
         peer={peerUser}
         callState={callState}
+        peerMicOn={peerMicOn}
         isCalleeOnline={isCalleeOnline}
         onMinimize={minimizeCall}
       />
@@ -166,13 +166,14 @@ export const CallScreen = () => {
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
           <CallControls
             onEnd={() => endCall({ initiatorUserId: selfUser.id })}
-            type={isVideo ? "video" : "voice"}
+            type={isVideo ? "video" : "audio"}
             isMicOn={isMicOn}
             isCameraOn={isCameraOn}
             onToggleMic={toggleMic}
             onToggleCamera={toggleCamera}
             onSwitchCamera={switchCamera}
             canSwitchCamera={canSwitchCamera}
+            localStreamRef={localStreamRef}
           />
         </div>
       )}
