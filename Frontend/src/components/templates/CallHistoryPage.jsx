@@ -92,7 +92,7 @@ export const CallHistoryPage = () => {
   // UI
   // =========================
   return (
-    <div className="flex flex-col h-full px-4 py-6 max-w-xl mx-auto space-y-6">
+    <div className="flex flex-col h-full w-full px-4 py-6 space-y-6 md:max-w-xl md:mx-auto">
       {/* ================= HEADER ================= */}
       <div className="flex flex-col items-center text-center gap-2">
         <Avatar className="w-20 h-20">

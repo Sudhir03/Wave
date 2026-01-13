@@ -1,17 +1,16 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useParams } from "react-router-dom";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-react";
-import { Search } from "lucide-react";
 
 import { getMyCallHistory } from "@/api/call";
 import { Input } from "@/components/atoms/Input";
-import { Button } from "@/components/atoms/Button";
 import { ContactItem } from "@/components/molecules/ContactItem";
 import { Spinner } from "@/components/atoms/Spinner";
 
 export const Call = () => {
   const { getToken } = useAuth();
+  const { id } = useParams(); // 👈 selected callId
   const [search, setSearch] = useState("");
 
   // =======================
@@ -73,11 +72,17 @@ export const Call = () => {
   // =======================
   return (
     <div className="flex flex-col h-full">
-      {/* Top Bar */}
+      {/* ================= TOP BAR ================= */}
       <div className="flex justify-between items-center bg-card sticky top-0 z-10 py-4 px-6 border-b border-border">
         <h1 className="text-xl font-bold">Call History</h1>
 
-        <div className="flex w-full max-w-md gap-2">
+        {/* SEARCH (hide on mobile when id exists) */}
+        <div
+          className={`
+            flex w-full max-w-md gap-2
+            ${id ? "hidden md:flex" : "flex"}
+          `}
+        >
           <Input
             placeholder="Search calls"
             value={search}
@@ -86,27 +91,33 @@ export const Call = () => {
         </div>
       </div>
 
-      <div className="flex flex-1">
-        {/* Sidebar */}
-        <aside className="w-80 border-r border-border">
-          <div className="p-4 overflow-y-auto custom-scrollbar">
+      {/* ================= CONTENT ================= */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* ================= LEFT PANEL (CALL LIST) ================= */}
+        <aside
+          className={`
+            w-full md:w-80
+            border-r border-border
+            overflow-y-auto custom-scrollbar
+            ${id ? "hidden md:block" : "block"}
+          `}
+        >
+          <div className="p-4">
             {isLoading && (
               <div className="flex justify-center py-6">
                 <Spinner />
               </div>
             )}
 
-            {!isLoading &&
-              groupedCalls &&
-              Object.keys(groupedCalls).length === 0 && (
-                <p className="text-sm text-muted-foreground text-center">
-                  No call history
-                </p>
-              )}
+            {!isLoading && Object.keys(groupedCalls).length === 0 && (
+              <p className="text-sm text-muted-foreground text-center">
+                No call history
+              </p>
+            )}
 
             {Object.entries(groupedCalls).map(([day, calls]) => (
               <div key={day} className="mb-4">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                   {day}
                 </h3>
 
@@ -120,8 +131,13 @@ export const Call = () => {
           </div>
         </aside>
 
-        {/* Right panel */}
-        <main className="flex-1 overflow-auto py-2">
+        {/* ================= RIGHT PANEL (DETAILS) ================= */}
+        <main
+          className={`
+            flex-1 overflow-auto py-2
+            ${id ? "block" : "hidden md:block"}
+          `}
+        >
           <Outlet />
         </main>
       </div>
