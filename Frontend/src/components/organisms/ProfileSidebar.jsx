@@ -17,7 +17,6 @@ function ProfileSidebar() {
 
   const links = [
     { to: "account", text: "Account", icon: User },
-    { to: "notification", text: "Notification", icon: Bell },
     { to: "personalization", text: "Personalization", icon: Sliders },
     { to: "blocked", text: "Blocked Users", icon: Ban },
     { to: "help", text: "Help", icon: HelpCircle },

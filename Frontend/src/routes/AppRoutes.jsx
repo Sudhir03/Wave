@@ -9,7 +9,6 @@ import MainLayout from "@/components/templates/MainLayout";
 
 // Pages
 import Account from "@/pages/Account";
-import Notification from "@/pages/Notification";
 import Personalization from "@/pages/Personalization";
 import Help from "@/pages/Help";
 import { Call } from "@/pages/Call";
@@ -45,7 +44,6 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <Account /> },
           { path: "account", element: <Account /> },
-          { path: "notification", element: <Notification /> },
           { path: "personalization", element: <Personalization /> },
           { path: "blocked", element: <BlockedUsersList /> },
           { path: "help", element: <Help /> },
