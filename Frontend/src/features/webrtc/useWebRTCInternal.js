@@ -25,6 +25,7 @@ export function useWebRTCInternal() {
   const remoteStreamRef = useRef(null);
   const peerUserRef = useRef(null);
   const pendingCandidates = useRef([]);
+  const callStartTimeRef = useRef(null);
 
   // =========================
   // STATE
@@ -106,6 +107,8 @@ export function useWebRTCInternal() {
     localStreamRef.current = null;
 
     remoteStreamRef.current = null;
+
+    callStartTimeRef.current = null;
 
     setHasLocalStream(false);
     setIsVideo(false);
@@ -241,6 +244,7 @@ export function useWebRTCInternal() {
       });
 
       setCallState("connected");
+      callStartTimeRef.current = Date.now();
     } catch (err) {
       console.error("acceptCall failed:", err);
       setCallState("idle");
@@ -466,7 +470,7 @@ export function useWebRTCInternal() {
         pcRef.current.addIceCandidate(c)
       );
       pendingCandidates.current = [];
-
+      callStartTimeRef.current = Date.now();
       setCallState("connected");
     };
 
@@ -605,5 +609,7 @@ export function useWebRTCInternal() {
     peerMicOn,
 
     localStreamVersion,
+
+    callStartTimeRef,
   };
 }

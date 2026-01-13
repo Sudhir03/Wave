@@ -19,7 +19,17 @@ export const CallControls = ({
   canSwitchCamera,
 }) => {
   return (
-    <div className="flex items-center justify-center gap-4 py-2 px-4 rounded-3xl bg-gray-300">
+    <div
+      className="
+    flex items-center justify-center
+    gap-4 sm:gap-4 
+    py-2 sm:py-2
+    px-4 sm:px-4 
+    rounded-3xl
+    bg-gray-300
+    flex-wrap sm:flex-nowrap
+  "
+    >
       {/* 🎤 Mic */}
       <IconButton icon={isMicOn ? Mic : MicOff} onClick={onToggleMic} />
 

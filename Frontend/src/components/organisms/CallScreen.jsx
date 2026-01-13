@@ -38,6 +38,7 @@ export const CallScreen = () => {
     peerMicOn,
 
     localStreamVersion,
+    callStartTimeRef,
   } = useWebRTC();
 
   /* ================= VIDEO REFS ================= */
@@ -140,6 +141,7 @@ export const CallScreen = () => {
         isVideo={isVideo}
         peer={peerUser}
         callState={callState}
+        callStartTime={callStartTimeRef.current}
         peerMicOn={peerMicOn}
         isCalleeOnline={isCalleeOnline}
         onMinimize={minimizeCall}

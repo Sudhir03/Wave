@@ -135,7 +135,7 @@ export default function ChatDetail() {
       </div>
 
       {/* ================= MESSAGES ================= */}
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-2">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-3">
         <div ref={topRef} />
 
         {messages.map((msg, i) => {
@@ -153,10 +153,11 @@ export default function ChatDetail() {
               {/* TEXT */}
               {msg.content && (
                 <div
-                  className={`max-w-[90%] sm:max-w-[75%] md:max-w-xs px-3 py-2 rounded-lg break-words whitespace-pre-wrap leading-relaxed ${
+                  className={`relative max-w-[65%] sm:max-w-[85%] md:max-w-xs lg:max-w-sm px-3 sm:px-4 py-2 text-sm sm:text-base rounded-2xl break-all sm:break-words whitespace-pre-wrap leading-relaxed transition-all duration-200 ease-out
+                  ${
                     msg.sender._id === userId
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
+                      ? "bg-primary text-primary-foreground ml-auto"
+                      : "bg-muted mr-auto"
                   }`}
                 >
                   {msg.content}
@@ -166,7 +167,7 @@ export default function ChatDetail() {
               {/* MEDIA */}
               {msg.media?.length > 0 && (
                 <>
-                  <div className="mt-1 flex gap-1 sm:gap-2 flex-wrap">
+                  <div className=" mt-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1 sm:gap-2">
                     {msg.media
                       .filter((m) => m.type === "image" || m.type === "video")
                       .slice(0, 5)
@@ -189,13 +190,14 @@ export default function ChatDetail() {
                       )}
                   </div>
 
-                  <div className="mt-2 space-y-2">
+                  <div className="mt-2 space-y-3">
                     {msg.media.map((m, idx) => {
                       if (m.type === "document")
                         return (
                           <DocumentAttachment
                             key={idx}
                             {...m}
+                            isMine={msg.sender._id === userId}
                             isUploading={m.isOptimistic}
                           />
                         );
@@ -205,6 +207,7 @@ export default function ChatDetail() {
                           <VoicePlayer
                             key={idx}
                             audioSrc={m.url}
+                            isMine={msg.sender._id === userId}
                             isUploading={m.isOptimistic}
                           />
                         );
@@ -218,6 +221,7 @@ export default function ChatDetail() {
                             isActive={
                               activeMediaId === `audio-${msg._id}-${idx}`
                             }
+                            isMine={msg.sender._id === userId}
                             onPlay={() =>
                               setActiveMediaId(`audio-${msg._id}-${idx}`)
                             }
