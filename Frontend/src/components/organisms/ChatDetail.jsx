@@ -24,7 +24,6 @@ import { DocumentAttachment } from "@/components/molecules/media/DocumentAttachm
 import { AudioPlayer } from "@/components/molecules/media/AudioPlayer";
 import { VoicePlayer } from "@/components/molecules/media/VoicePlayer";
 import { VoiceMessageSender } from "@/components/molecules/VoiceMessageSender";
-import { ChatSearch } from "@/components/molecules/ChatSearch";
 import { MoreOptionsPopover } from "@/components/molecules/MoreOptionsPopover";
 import { CallPopover } from "@/components/molecules/CallPopover";
 import { MessageStatus } from "@/components/molecules/MessageStatus";
@@ -127,7 +126,6 @@ export default function ChatDetail() {
 
         {/* RIGHT SECTION — can shrink */}
         <div className="flex items-center gap-0 shrink">
-          {/* <ChatSearch messages={messages} /> */}
           <CallPopover type="audio" peer={chat} />
           <CallPopover type="video" peer={chat} />
           <MoreOptionsPopover options={[]} />
@@ -291,7 +289,7 @@ export default function ChatDetail() {
           onBlur={() => handleTyping("typing_stop")}
           placeholder="Type a message..."
           rows={1}
-          className="flex-1 resize-none overflow-y-auto max-h-24 min-h-10 leading-5 text-sm sm:text-base break-words whitespace-pre-wrap border border-border focus:border-2 focus:border-border focus-visible:ring-0 focus-visible:outline-none shadow-none custom-scrollbar"
+          className="flex-1 resize-none overflow-y-auto max-h-24 min-h-10 leading-5 text-sm sm:text-base break-all whitespace-pre-wrap border border-border focus:border-border focus-visible:ring-0 focus-visible:outline-none shadow-none custom-scrollbar"
         />
 
         {/* SEND BUTTON */}

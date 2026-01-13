@@ -1,5 +1,4 @@
 import { Phone, Video } from "lucide-react";
-import { Button } from "@/components/atoms/Button";
 import { useWebRTC } from "@/features/webrtc/CallContext";
 
 export const CallPopover = ({ type, peer }) => {
@@ -18,8 +17,8 @@ export const CallPopover = ({ type, peer }) => {
   };
 
   return (
-    <Button variant="ghost" onClick={handleClick}>
+    <button onClick={handleClick} className="p-2 cursor-pointer">
       <Icon className="w-5 h-5" />
-    </Button>
+    </button>
   );
 };

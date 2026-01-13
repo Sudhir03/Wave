@@ -14,18 +14,23 @@ exports.getMyCallHistory = catchAsync(async (req, res) => {
   const history = calls.map((call) => {
     const isCaller = call.callerId._id.toString() === userId;
 
+    let status;
+
+    if (call.connectedAt) {
+      status = "connected";
+    } else if (call.endedAt) {
+      status = "missed";
+    } else {
+      // Safety fallback (ideally yeh case history me aana hi nahi chahiye)
+      status = "missed";
+    }
+
     return {
       callId: call._id,
-      type: call.callType,
+      type: call.callType, // audio | video
       direction: isCaller ? "outgoing" : "incoming",
       otherUser: isCaller ? call.calleeId : call.callerId,
-
-      status: call.connectedAt
-        ? "connected"
-        : call.endedAt
-        ? "missed"
-        : "initiated",
-
+      status,
       startedAt: call.createdAt,
       endedAt: call.endedAt,
       duration: call.duration,

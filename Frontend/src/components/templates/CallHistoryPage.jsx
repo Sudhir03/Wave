@@ -1,178 +1,169 @@
 import { useParams } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/clerk-react";
 import { Avatar, AvatarFallback, AvatarImage } from "../atoms/Avatar";
-import { Phone, Video, XCircle } from "lucide-react";
-import { useState } from "react";
+import { Spinner } from "../atoms/Spinner";
 import { getAvatarGradient } from "@/lib/colorGradient";
-// import { VideoCallWindow } from "../organisms/VideoCallWindow";
-import { NormalCallCard } from "../organisms/NormalCallCard";
+import { getMyCallHistory } from "@/api/call";
+import { CallPopover } from "../molecules/CallPopover";
 
-const callHistory = {
-  1: [
-    { type: "voice", date: "2025-09-17 14:32", duration: "5m 23s" },
-    { type: "video", date: "2025-09-16 18:10", duration: "12m 45s" },
-  ],
-  2: [{ type: "missed", date: "2025-09-15 09:20", duration: "3m 11s" }],
-  3: [],
-  4: [{ type: "video", date: "2025-09-12 21:05", duration: "25m 0s" }],
+/* helper */
+const formatDuration = (seconds = 0) => {
+  const total = Math.floor(seconds);
+
+  const hrs = Math.floor(total / 3600);
+  const mins = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+
+  // ⏱️ If 1 hour or more → hh:mm:ss
+  if (hrs > 0) {
+    return `${hrs.toString().padStart(2, "0")}:${mins
+      .toString()
+      .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  }
+
+  // ⏱️ Otherwise → mm:ss
+  return `${mins.toString().padStart(2, "0")}:${secs
+    .toString()
+    .padStart(2, "0")}`;
 };
 
 export const CallHistoryPage = () => {
-  const { id } = useParams();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [callType, setCallType] = useState(null); // "voice" or "video"
+  const { id } = useParams(); // callId
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
 
-  const contacts = {
-    1: { name: "Alice", img: "/avatars/1.png" },
-    2: { name: "Bob", img: "/avatars/2.png" },
-    3: { name: "Charlie", img: "/avatars/3.png" },
-    4: { name: "Diana", img: "/avatars/4.png" },
-  };
+  // =========================
+  // READ & NORMALIZE CACHE
+  // =========================
+  const cachedRaw = queryClient.getQueryData(["callHistory"]);
 
-  // ✅ derive index based on object keys
-  const contactIds = Object.keys(contacts); // ["1","2","3","4"]
-  const contactIndex = contactIds.indexOf(id); // gives proper index
-  const contact = contacts[id];
-  const history = callHistory[id] || [];
+  const cachedCalls = Array.isArray(cachedRaw)
+    ? cachedRaw
+    : cachedRaw?.data ?? [];
 
-  if (!contact) {
+  // =========================
+  // FALLBACK FETCH (only if cache empty)
+  // =========================
+  const { data: fetchedCalls = [], isLoading } = useQuery({
+    queryKey: ["callHistory"],
+    enabled: cachedCalls.length === 0,
+    queryFn: async () => {
+      const token = await getToken();
+      return getMyCallHistory({ token });
+    },
+    select: (res) => res.data, // 👈 array only
+  });
+
+  const calls = cachedCalls.length ? cachedCalls : fetchedCalls;
+
+  // =========================
+  // FIND CALL BY callId
+  // =========================
+  const call = calls.find((c) => c.callId === id);
+
+  if (isLoading && cachedCalls.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-muted-foreground">
-        Select a call to see details
+      <div className="flex justify-center py-10">
+        <Spinner />
       </div>
     );
   }
 
-  const openModal = (type) => {
-    setCallType(type);
-    setIsModalOpen(true);
+  if (!id) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center text-center text-muted-foreground px-6">
+        <p className="text-sm font-medium">Select a call to view details</p>
+        <p className="text-xs mt-1">Choose a call from your call history</p>
+      </div>
+    );
+  }
+
+  const { otherUser } = call;
+
+  const peer = {
+    _id: call?.otherUser?._id,
+    fullName:
+      `${call?.otherUser?.firstName} ${call?.otherUser?.lastName}`.trim(),
+    profileImageUrl: call?.otherUser?.profileImageUrl,
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setCallType(null);
-  };
-
+  // =========================
+  // UI
+  // =========================
   return (
-    <div className="flex flex-col h-full p-3 md:p-4 space-y-4">
+    <div className="flex flex-col h-full px-4 py-6 max-w-xl mx-auto space-y-6">
       {/* ================= HEADER ================= */}
-      <div
-        className="
-      flex flex-col sm:flex-row
-      sm:items-center sm:justify-between
-      gap-3
-      border-b border-border pb-2
-    "
-      >
-        {/* Left */}
-        <div className="flex items-center gap-3">
-          <Avatar className="w-10 h-10 rounded cursor-pointer">
-            <AvatarImage src={contact.img} />
-            <AvatarFallback
-              className={`flex items-center justify-center font-medium ${getAvatarGradient(
-                contactIndex
-              )}`}
-            >
-              {contact.name.charAt(0)}
-            </AvatarFallback>
-          </Avatar>
+      <div className="flex flex-col items-center text-center gap-2">
+        <Avatar className="w-20 h-20">
+          <AvatarImage src={otherUser.profileImageUrl} />
+          <AvatarFallback className={getAvatarGradient(0)}>
+            {otherUser.firstName.charAt(0)}
+          </AvatarFallback>
+        </Avatar>
 
-          <h2 className="text-lg font-semibold truncate">{contact.name}</h2>
+        <h2 className="text-xl font-semibold">
+          {otherUser.firstName} {otherUser.lastName}
+        </h2>
+
+        <div
+          className={`text-sm font-medium ${
+            call.status === "missed" ? "text-red-500" : "text-green-600"
+          }`}
+        >
+          {call.status === "missed" ? "Missed call" : "Connected call"}
         </div>
 
-        {/* Right – Call buttons */}
-        <div className="flex gap-2 self-end sm:self-auto">
-          <button
-            className="
-          p-2 rounded-full
-          bg-gray-200 hover:bg-gray-300
-          cursor-pointer
-        "
-            onClick={() => openModal("voice")}
-          >
-            <Phone className="w-5 h-5" />
-          </button>
-
-          <button
-            className="
-          p-2 rounded-full
-          bg-gray-200 hover:bg-gray-300
-          cursor-pointer
-        "
-            onClick={() => openModal("video")}
-          >
-            <Video className="w-5 h-5" />
-          </button>
+        {/* ✅ Duration (ONLY if connected) */}
+        <div className="text-xs text-muted-foreground">
+          {call.status === "connected" &&
+            call.duration > 0 &&
+            formatDuration(call.duration)}
         </div>
       </div>
 
-      {/* ================= CALL HISTORY ================= */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
-        {history.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-6">
-            No calls yet.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {history.map((call, index) => (
-              <li
-                key={index}
-                className="
-              flex flex-col sm:flex-row
-              sm:items-center sm:justify-between
-              gap-2
-              p-3
-              rounded-lg
-              border border-border
-              hover:bg-accent/10
-              transition-colors
-            "
-              >
-                {/* Left side */}
-                <div className="flex items-center gap-2">
-                  {call.type === "voice" ? (
-                    <Phone className="w-5 h-5 text-green-500" />
-                  ) : call.type === "video" ? (
-                    <Video className="w-5 h-5 text-blue-500" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-red-400" />
-                  )}
+      {/* ================= ACTION BUTTONS ================= */}
+      <div className="flex justify-center gap-4">
+        <div className="p-1 rounded-full bg-gray-200">
+          <CallPopover type="audio" peer={peer} />
+        </div>
+        <div className="p-1 rounded-full bg-gray-200">
+          <CallPopover type="video" peer={peer} />
+        </div>
+      </div>
 
-                  <span className="text-sm text-muted-foreground">
-                    {new Date(call.date).toLocaleString([], {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
-                  </span>
-                </div>
+      {/* ================= DETAILS CARD ================= */}
+      <div className="border rounded-xl p-4 space-y-3 bg-card">
+        <DetailRow label="Call type" value={call.type} />
+        <DetailRow label="Direction" value={call.direction} />
 
-                {/* Right side */}
-                <span className="text-xs font-medium text-gray-500 self-end sm:self-auto">
-                  {call.duration}
-                </span>
-              </li>
-            ))}
-          </ul>
+        <DetailRow
+          label="Started at"
+          value={new Date(call.startedAt).toLocaleString("en-US", {
+            dateStyle: "medium",
+            timeStyle: "short",
+          })}
+        />
+
+        {call.endedAt && (
+          <DetailRow
+            label="Ended at"
+            value={new Date(call.endedAt).toLocaleString("en-US", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            })}
+          />
         )}
       </div>
+    </div>
+  );
+};
 
-      {/* ================= MODAL ================= */}
-      {isModalOpen && (
-        <div
-          className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full h-full">
-            {callType === "voice" && (
-              <NormalCallCard
-                name={contact.name}
-                img={contact.img}
-                onEnd={closeModal}
-              />
-            )}
-          </div>
-        </div>
-      )}
+const DetailRow = ({ label, value }) => {
+  return (
+    <div className="flex justify-between items-center text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="capitalize font-medium">{value}</span>
     </div>
   );
 };
