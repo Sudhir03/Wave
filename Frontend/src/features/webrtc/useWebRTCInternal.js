@@ -146,7 +146,7 @@ export function useWebRTCInternal() {
 
       // ✅ RESET STATES HERE
       setIsMicOn(true);
-      setIsCameraOn(video);
+      setIsCameraOn(true);
 
       // 🔹 Optional: check if callee is online
 
@@ -208,7 +208,7 @@ export function useWebRTCInternal() {
 
       // ✅ RESET STATES HERE
       setIsMicOn(true);
-      setIsCameraOn(video);
+      setIsCameraOn(true);
 
       // 🔹 Create Peer first (callerId for ICE routing)
       if (!peerUser?.id) return;
@@ -462,14 +462,20 @@ export function useWebRTCInternal() {
     const onCallId = ({ callId }) => setCallId(callId);
 
     const onAnswer = async ({ answer }) => {
-      if (!pcRef.current) return;
-      await pcRef.current.setRemoteDescription(answer);
+      const pc = pcRef.current;
+      if (!pc) return;
 
-      // 🔥 FLUSH ICE CANDIDATES HERE
-      pendingCandidates.current.forEach((c) =>
-        pcRef.current.addIceCandidate(c)
-      );
+      // 🔥 VERY IMPORTANT GUARD
+      if (pc.signalingState !== "have-local-offer") {
+        console.warn("Answer ignored. State =", pc.signalingState);
+        return;
+      }
+
+      await pc.setRemoteDescription(answer);
+
+      pendingCandidates.current.forEach((c) => pc.addIceCandidate(c));
       pendingCandidates.current = [];
+
       callStartTimeRef.current = Date.now();
       setCallState("connected");
     };
