@@ -1,7 +1,13 @@
 import { formatFileSize } from "@/lib/utils";
 import { FileText, Upload } from "lucide-react";
 
-export function DocumentAttachment({ fileName, fileSize, url, isUploading }) {
+export function DocumentAttachment({
+  fileName,
+  fileSize,
+  url,
+  isUploading,
+  isMine,
+}) {
   const handleClick = () => {
     if (isUploading) return;
     if (!url) return;
@@ -17,21 +23,45 @@ export function DocumentAttachment({ fileName, fileSize, url, isUploading }) {
   return (
     <div
       onClick={handleClick}
-      className="relative flex items-center gap-3 p-3 rounded-lg border
-        bg-blue-50 hover:bg-blue-100 cursor-pointer max-w-xs"
+      className={`
+    relative
+    flex items-center gap-3
+    p-3
+    rounded-lg
+    border
+    bg-blue-50 hover:bg-blue-100
+    cursor-pointer
+    transition-colors
+
+    w-full
+    max-w-[90%]
+    sm:max-w-md
+
+    ${isMine ? "ml-auto" : "mr-auto"}
+  `}
     >
       {/* Icon container */}
       <div
-        className="relative shrink-0 w-10 h-10 bg-blue-500 rounded-lg
-        flex items-center justify-center overflow-hidden"
+        className="
+          relative
+          shrink-0
+          w-10 h-10
+          bg-blue-500
+          rounded-lg
+          flex items-center justify-center
+          overflow-hidden
+        "
       >
         <FileText className="w-5 h-5 text-white" />
 
         {/* Upload overlay */}
         {isUploading && (
           <div
-            className="absolute inset-0 flex items-center justify-center
-            bg-black/60"
+            className="
+              absolute inset-0
+              flex items-center justify-center
+              bg-black/60
+            "
           >
             <Upload className="w-4 h-4 text-white animate-pulse" />
           </div>

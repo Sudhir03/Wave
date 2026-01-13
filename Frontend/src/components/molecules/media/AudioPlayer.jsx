@@ -10,6 +10,7 @@ export function AudioPlayer({
   isActive,
   onPlay,
   isUploading,
+  isMine,
 }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -77,10 +78,24 @@ export function AudioPlayer({
   const progress = duration ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="relative flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100 max-w-sm">
+    <div
+      className={`
+        relative
+        flex items-center gap-3
+        p-3
+        bg-blue-50
+        rounded-lg
+        border border-blue-100
+
+        w-full
+        max-w-[90%]
+        sm:max-w-sm
+
+        ${isMine ? "ml-auto" : "mr-auto"}
+      `}
+    >
       <audio ref={audioRef} src={audioUrl} preload="metadata" />
 
-      {/* PLAY / PAUSE */}
       <Button
         variant="ghost"
         size="sm"
@@ -88,14 +103,12 @@ export function AudioPlayer({
         className="relative w-10 h-10 p-0 bg-blue-500 hover:bg-blue-600 rounded-lg"
         onClick={togglePlayPause}
       >
-        {/* Play / Pause */}
         {isPlaying ? (
           <Pause className="w-5 h-5 text-white" />
         ) : (
           <Play className="w-5 h-5 text-white ml-0.5" />
         )}
 
-        {/* Upload overlay ON TOP of Play/Pause */}
         {isUploading && (
           <span className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg">
             <Upload className="w-4 h-4 text-white animate-pulse" />
@@ -103,7 +116,6 @@ export function AudioPlayer({
         )}
       </Button>
 
-      {/* INFO */}
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium truncate mb-1">{fileName}</div>
 
