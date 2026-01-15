@@ -39,22 +39,29 @@ export const CallBackground = ({
   peerCameraOn = true,
   localVideoRef,
   remoteVideoRef,
+
+  // 🔥 NEW
+  busyReason,
 }) => {
+  const isBusy = callState === "busy";
+
   // ✅ ONLY calling + ringing
   const isLocalPreviewPhase =
     callState === "calling" || callState === "ringing";
 
   const showPulse =
+    isBusy ||
     (!isVideo && callState !== "connected") ||
     isLocalPreviewPhase ||
     callState === "incoming";
 
-  const showAvatar = !isVideo || !peerCameraOn || callState === "incoming";
+  const showAvatar =
+    isBusy || !isVideo || !peerCameraOn || callState === "incoming";
 
   return (
     <div className="absolute inset-0 bg-black overflow-hidden">
       {/* ================= FULLSCREEN VIDEO ================= */}
-      {isVideo && (
+      {isVideo && !isBusy && (
         <video
           ref={
             callState === "connected" && hasRemoteStream && peerCameraOn
@@ -84,11 +91,23 @@ export const CallBackground = ({
           <h2 className="mt-6 text-2xl font-semibold">{peer?.name}</h2>
 
           <p className="mt-2 text-sm text-slate-400">
-            {!isVideo ? "Audio call" : "Video call"}
+            {isBusy
+              ? "Call unavailable"
+              : !isVideo
+              ? "Audio call"
+              : "Video call"}
           </p>
 
-          <p className="mt-2 text-xs tracking-wide text-slate-400">
-            {callState === "incoming" ? "Incoming call" : callState}
+          <p
+            className={`mt-2 text-xs tracking-wide ${
+              isBusy ? "text-red-400" : "text-slate-400"
+            }`}
+          >
+            {isBusy
+              ? busyReason || "User is busy on another call"
+              : callState === "incoming"
+              ? "Incoming call"
+              : callState}
           </p>
         </div>
       )}

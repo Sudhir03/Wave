@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import socket from "../../socket";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getMyProfile } from "@/api/users";
 import { useAuth } from "@clerk/clerk-react";
+import { toast } from "react-toastify";
 
 const ICE_SERVERS = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
@@ -45,6 +46,7 @@ export function useWebRTCInternal() {
   const [peerMicOn, setPeerMicOn] = useState(true);
   const [localStreamVersion, setLocalStreamVersion] = useState(0);
   const [canSwitchCamera, setCanSwitchCamera] = useState(false);
+  const [busyReason, setBusyReason] = useState(null);
 
   // 🔑 NEW: Presence flag (caller side only)
   const [isCalleeOnline, setIsCalleeOnline] = useState(false);
@@ -99,7 +101,7 @@ export function useWebRTCInternal() {
   // =========================
   // CLEANUP (LOCAL ONLY)
   // =========================
-  const cleanupCall = () => {
+  const cleanupCall = ({ keepState = false } = {}) => {
     pcRef.current?.close();
     pcRef.current = null;
 
@@ -107,7 +109,6 @@ export function useWebRTCInternal() {
     localStreamRef.current = null;
 
     remoteStreamRef.current = null;
-
     callStartTimeRef.current = null;
 
     setHasLocalStream(false);
@@ -117,11 +118,15 @@ export function useWebRTCInternal() {
     setPeerUser(null);
     setCallId(null);
 
-    // ✅ RESET PEER MEDIA STATE
     setPeerCameraOn(true);
     setPeerMicOn(true);
+    setBusyReason(null);
 
-    setCallState("idle");
+    socket.currentCallId = null;
+
+    if (!keepState) {
+      setCallState("idle");
+    }
   };
 
   // =========================
@@ -131,6 +136,10 @@ export function useWebRTCInternal() {
     try {
       if (!selfUser) {
         console.error("Caller profile missing");
+        return;
+      }
+      if (callState !== "idle") {
+        toast.info("You are already in a call");
         return;
       }
 
@@ -196,6 +205,10 @@ export function useWebRTCInternal() {
     try {
       if (!selfUser) {
         console.error("Caller profile missing");
+        return;
+      }
+      if (callState !== "incoming") {
+        toast.info("No incoming call to accept");
         return;
       }
 
@@ -266,7 +279,7 @@ export function useWebRTCInternal() {
       console.error("declineCall failed:", error);
     } finally {
       cleanupCall();
-      setCallState("ended");
+      setCallState("idle");
     }
   };
 
@@ -283,7 +296,7 @@ export function useWebRTCInternal() {
       console.error("endCall failed:", error);
     } finally {
       cleanupCall();
-      setCallState("ended");
+      setCallState("idle");
     }
   };
 
@@ -495,12 +508,12 @@ export function useWebRTCInternal() {
 
     const onDeclined = () => {
       cleanupCall();
-      setCallState("ended");
+      setCallState("idle");
     };
 
     const onEnded = () => {
       cleanupCall();
-      setCallState("ended");
+      setCallState("idle");
     };
 
     const onCalleeStatus = ({ online }) => {
@@ -530,6 +543,21 @@ export function useWebRTCInternal() {
       setPeerMicOn(micOn);
     };
 
+    //busy
+    const onUserBusy = ({ reason }) => {
+      setBusyReason(reason || "User is busy on another call");
+
+      cleanupCall({ keepState: true });
+
+      // 🔥 IMPORTANT
+      setCallState("busy");
+    };
+
+    const onCallCancelled = () => {
+      cleanupCall();
+      setCallState("idle");
+    };
+
     // =========================
     // Socket Listeners
     // =========================
@@ -542,6 +570,8 @@ export function useWebRTCInternal() {
     socket.on("webrtc_call_end", onEnded);
     socket.on("callee_status", onCalleeStatus);
     socket.on("webrtc_media_state", onPeerMediaState);
+    socket.on("webrtc_user_busy", onUserBusy);
+    socket.on("webrtc_call_cancelled", onCallCancelled);
 
     // =========================
     // Cleanup
@@ -556,6 +586,8 @@ export function useWebRTCInternal() {
       socket.off("webrtc_call_end", onEnded);
       socket.off("callee_status", onCalleeStatus);
       socket.off("webrtc_media_state", onPeerMediaState);
+      socket.off("webrtc_user_busy", onUserBusy);
+      socket.off("webrtc_call_cancelled", onCallCancelled);
     };
   }, []);
 
@@ -563,18 +595,28 @@ export function useWebRTCInternal() {
   // RING TIMEOUT (CALLER SIDE)
   // =========================
   useEffect(() => {
-    // Only apply to caller when ringing
     if (callState !== "ringing") return;
-    if (!selfUser?.id) return; // 🔥 SAFETY GUARD
+    if (!selfUser?.id) return;
 
     const timeout = setTimeout(() => {
-      console.warn("Call timed out (no answer)");
-
-      endCall({ initiatorUserId: selfUser.id });
-    }, 30000); // 30 seconds
+      socket.emit("webrtc_call_cancel", { callId });
+      cleanupCall();
+    }, 30000);
 
     return () => clearTimeout(timeout);
-  }, [callState, selfUser, endCall]);
+  }, [callState, callId, selfUser]);
+
+  // automatic cleanup of busy call
+  useEffect(() => {
+    if (callState === "busy") {
+      const t = setTimeout(() => {
+        setBusyReason(null);
+        setCallState("idle");
+      }, 2500);
+
+      return () => clearTimeout(t);
+    }
+  }, [callState]);
 
   // =========================
   // EXPOSE
@@ -617,5 +659,6 @@ export function useWebRTCInternal() {
     localStreamVersion,
 
     callStartTimeRef,
+    busyReason,
   };
 }

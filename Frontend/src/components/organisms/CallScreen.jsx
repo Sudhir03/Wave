@@ -39,6 +39,7 @@ export const CallScreen = () => {
 
     localStreamVersion,
     callStartTimeRef,
+    busyReason,
   } = useWebRTC();
 
   /* ================= REFS ================= */
@@ -152,6 +153,7 @@ export const CallScreen = () => {
             isMicOn={isMicOn}
             peerCameraOn={peerCameraOn}
             localVideoRef={localVideoRef}
+            busyReason={busyReason}
             remoteVideoRef={remoteVideoRef}
           />
 

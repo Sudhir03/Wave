@@ -462,7 +462,7 @@ export default function ChatWindow() {
       </div>
 
       {/* ================= RIGHT PANEL ================= */}
-      <div className={`${chatId ? "block" : "hidden md:block"} flex-1`}>
+      <div className={`${chatId ? "block" : "hidden md:block"} flex-1 min-h-0`}>
         {chatId || friendId ? (
           <Outlet context={{ activeChat }} />
         ) : (
