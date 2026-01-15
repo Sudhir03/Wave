@@ -79,9 +79,7 @@ export function useChatDetail() {
   // =======================
   // Fetch Messages (Paginated)
   // =======================
-  /* =========================
-     Reset cache on chat switch
-  ========================= */
+
   useEffect(() => {
     if (!chatId) return;
     queryClient.removeQueries({ queryKey: ["messages", chatId], exact: true });
@@ -90,37 +88,55 @@ export function useChatDetail() {
   /* =========================
      Messages
   ========================= */
-  const { data } = useInfiniteQuery({
-    queryKey: ["messages", chatId],
-    enabled: !!chatId,
-    queryFn: async ({ pageParam }) => {
-      const token = await getToken();
-      return getMessages({
-        conversationId: chatId,
-        cursor: pageParam,
-        token,
-      });
-    },
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-  });
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery({
+      queryKey: ["messages", chatId],
+      enabled: !!chatId,
+      initialPageParam: null, // 👈 IMPORTANT
+      queryFn: async ({ pageParam }) => {
+        const token = await getToken();
+        return getMessages({
+          conversationId: chatId,
+          cursor: pageParam,
+          limit: 20,
+          token,
+        });
+      },
+      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    });
 
   // =======================
-  // Normalize & Sort Messages
+  // Normalize
   // =======================
-  const messages =
-    data?.pages
-      ?.flatMap((p) => p.messages)
-      .sort(
-        (a, b) =>
-          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-      ) || [];
 
-  // =======================
-  // Auto Scroll to Bottom
-  // =======================
+  const messages = data?.pages.flatMap((page) => page.messages) ?? [];
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!messages.length) return;
+
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({
+        behavior: "auto",
+        block: "end",
+      });
+    });
   }, [messages]);
+
+  useEffect(() => {
+    if (!topRef.current || !hasNextPage) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(topRef.current);
+
+    return () => observer.disconnect();
+  }, [hasNextPage, fetchNextPage, isFetchingNextPage]);
 
   // =======================
   // Socket: Chat Join / Leave
@@ -170,6 +186,11 @@ export function useChatDetail() {
 
         if (!replaced) {
           pages[pages.length - 1].messages.push(data);
+
+          // 🔥 auto-scroll only for NEW incoming message
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+          }, 50);
         }
 
         return { ...old, pages };

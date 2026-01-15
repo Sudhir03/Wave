@@ -137,10 +137,6 @@ export default function ChatDetail() {
         <div ref={topRef} />
 
         {messages.map((msg, i) => {
-          const showTime =
-            !messages[i + 1] ||
-            formatTime(messages[i + 1].timestamp) !== formatTime(msg.timestamp);
-
           return (
             <div
               key={msg._id}
@@ -151,7 +147,7 @@ export default function ChatDetail() {
               {/* TEXT */}
               {msg.content && (
                 <div
-                  className={`relative max-w-[65%] sm:max-w-[85%] md:max-w-xs lg:max-w-sm px-3 sm:px-4 py-2 text-sm sm:text-base rounded-2xl break-all sm:break-words whitespace-pre-wrap leading-relaxed transition-all duration-200 ease-out
+                  className={`relative max-w-[65%] sm:max-w-[85%] md:max-w-xs lg:max-w-sm px-3 sm:px-4 py-2 text-sm sm:text-base rounded-2xl break-all  whitespace-pre-wrap leading-relaxed transition-all duration-200 ease-out
                   ${
                     msg.sender._id === userId
                       ? "bg-primary text-primary-foreground ml-auto"
@@ -165,7 +161,13 @@ export default function ChatDetail() {
               {/* MEDIA */}
               {msg.media?.length > 0 && (
                 <>
-                  <div className=" mt-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1 sm:gap-2">
+                  <div
+                    className={`mt-1 flex flex-wrap gap-1 sm:gap-2 max-w-fit ${
+                      msg.sender._id === userId
+                        ? "self-end justify-end"
+                        : "self-start justify-start"
+                    }`}
+                  >
                     {msg.media
                       .filter((m) => m.type === "image" || m.type === "video")
                       .slice(0, 5)
@@ -215,6 +217,7 @@ export default function ChatDetail() {
                           <AudioPlayer
                             key={idx}
                             {...m}
+                            audioUrl={m.url}
                             isUploading={m.isOptimistic}
                             isActive={
                               activeMediaId === `audio-${msg._id}-${idx}`
@@ -233,16 +236,14 @@ export default function ChatDetail() {
               )}
 
               {/* TIME + STATUS */}
-              {showTime && (
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-xs text-muted-foreground">
-                    {formatTime(msg.timestamp)}
-                  </span>
-                  {msg.sender._id === userId && (
-                    <MessageStatus status={msg.status} />
-                  )}
-                </div>
-              )}
+              <div className="flex items-center gap-1 mt-1">
+                <span className="text-xs text-muted-foreground">
+                  {formatTime(msg.timestamp)}
+                </span>
+                {msg.sender._id === userId && (
+                  <MessageStatus status={msg.status} />
+                )}
+              </div>
             </div>
           );
         })}
